@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useApi, useResource } from "@/lib/api";
-import { Badge, Empty, Heading, Loading, Progress, toneFor } from "@/components/civic/ui";
+import { Badge, Empty, Heading, Loading, Panel, Progress, toneFor } from "@/components/civic/ui";
+import { ScheduleCurve } from "@/components/civic/Charts";
+import { Variance } from "@/components/civic/ProjectRow";
 import { ActivityForm, IssueForm, ProjectForm, ReportForm } from "@/components/civic/forms";
 import { IssueList, ReportList } from "@/components/civic/Records";
 import { AttachmentList, Uploader } from "@/components/civic/Attachments";
@@ -30,6 +32,18 @@ function ActivityRow({ a, reload }) {
     <select className={`status-select tone-${toneFor(a.status)}`} value={a.status} onChange={e => save({ status: e.target.value, ...(e.target.value === "Completed" ? { progress: 100 } : {}) })} data-testid={`activity-status-${a.id}`}>{["Not started", "In progress", "Completed"].map(s => <option key={s}>{s}</option>)}</select>
     <button className="icon-btn small" onClick={remove} aria-label="Delete activity" data-testid={`delete-activity-${a.id}`}><Trash2 size={14} /></button>
   </div>;
+}
+
+function SchedulePanel({ project, onEdit }) {
+  const [curve] = useResource(`/projects/${project.id}/curve`);
+  if (!curve) return null;
+  if (curve.missing_dates) return <section className="insight-band schedule-panel" data-testid="schedule-missing"><div className="insight-copy"><div><p className="eyebrow">PLANNED VS ACTUAL</p><h3>Add planned start and finish dates</h3><p>CIVICPRO draws a standard S-curve between them and tracks actual progress against it.</p></div></div><button className="dark-btn" onClick={onEdit} data-testid="set-schedule-button">Set dates →</button></section>;
+  const v = curve.variance;
+  return <Panel eyebrow="PLANNED VS ACTUAL" title="Progress S-curve" testid="schedule-panel" actions={<Variance value={v} testid="schedule-variance" />}>
+    <div className="schedule-stats"><div><span>PLANNED TODAY</span><b data-testid="planned-today">{curve.planned_today}%</b></div><div><span>ACTUAL</span><b data-testid="actual-today">{curve.actual_today}%</b></div>
+      <div><span>VARIANCE</span><b className={v >= 0 ? "ahead" : "behind"}>{v >= 0 ? "+" : ""}{v}% {v >= 0 ? "ahead" : "behind"}</b></div><div><span>SCHEDULE</span><b className="dates">{project.start_date} → {project.end_date}</b></div></div>
+    <ScheduleCurve curve={curve} />
+  </Panel>;
 }
 
 const TABS = ["activities", "reports", "issues", "files"];
@@ -60,6 +74,7 @@ export default function ProjectDetail() {
       <div className="hero-meta"><Badge tone={toneFor(p.status)} testid="project-status">{p.status}</Badge>{p.progress_mode === "activity" && <span>Manual estimate {p.manual_progress}%</span>}</div>
       {p.summary && <p className="hero-summary" data-testid="project-summary">{p.summary}</p>}
     </section>
+    <SchedulePanel key={`${p.progress}-${p.start_date}-${p.end_date}`} project={p} onEdit={() => setModal("edit")} />
     <div className="tabs" role="tablist">{TABS.map(t => <button key={t} role="tab" className={tab === t ? "active" : ""} onClick={() => setTab(t)} data-testid={`tab-${t}`}>{t}<i>{counts[t]}</i></button>)}
       <div className="tab-action">{add ? <button className="primary-btn" onClick={() => setModal(add)} data-testid={`add-${add}-button`}><Plus size={16} /> Add {add}</button> : <Uploader target={{ project_id: p.id, entity_type: "project" }} onDone={reload} testid="project-upload" />}</div></div>
     <div className="list-page">

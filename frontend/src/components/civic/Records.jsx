@@ -62,7 +62,7 @@ export function IssueList({ issues, reload }) {
   return <div className="record-list">{issues.map(i => {
     const overdue = i.status !== "Resolved" && i.due_date && i.due_date < today;
     return <Row key={i.id} testid={`issue-${i.id}`} icon={<ShieldAlert size={18} />} tone={toneFor(i.severity)} title={i.title}
-      meta={<>{i.project_name} · <Badge tone={toneFor(i.severity)}>{i.severity}</Badge> {i.category} · {i.owner || "Unassigned"}{overdue && <Badge tone="red" testid={`overdue-${i.id}`}>Overdue</Badge>}</>}
+      meta={<>{i.project_name} · <Badge tone={toneFor(i.severity)}>{i.severity}</Badge> {i.category} · {i.owner || "Unassigned"}{overdue && <Badge tone="red" testid={`overdue-${i.id}`}>Overdue</Badge>}{i.reminder_sent_at && <Badge tone="slate" testid={`reminded-${i.id}`}>Reminder sent {i.reminder_sent_at.slice(0, 10)}</Badge>}</>}
       right={<StatusSelect issue={i} reload={reload} />} date={i.due_date ? `Due ${i.due_date}` : i.created_at.slice(0, 10)}>
       <div className="detail-grid"><div><span>Details & action</span><p>{i.description || "No details added."}</p></div><div><span>Logged by</span><p>{i.created_by_name || "Team member"} · {i.created_at.slice(0, 10)}</p></div></div>
       <AttachmentList files={i.files} onChange={reload} />

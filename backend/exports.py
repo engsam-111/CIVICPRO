@@ -10,7 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 AMBER = colors.HexColor("#d97706")
 INK = colors.HexColor("#0f172a")
 COLUMNS = {
-    "Projects": [("code", "Code"), ("name", "Project"), ("location", "Location"), ("client", "Client"), ("progress", "Progress %"), ("progress_mode", "Progress basis"), ("status", "Status"), ("summary", "Summary")],
+    "Projects": [("code", "Code"), ("name", "Project"), ("location", "Location"), ("client", "Client"), ("start_date", "Start"), ("end_date", "Finish"), ("planned_progress", "Planned %"), ("progress", "Actual %"), ("schedule_variance", "Variance %"), ("progress_mode", "Progress basis"), ("status", "Status"), ("summary", "Summary")],
     "Activities": [("project_name", "Project"), ("name", "Activity"), ("owner", "Owner"), ("weight", "Weight"), ("progress", "Progress %"), ("status", "Status"), ("due_date", "Due")],
     "Reports": [("project_name", "Project"), ("report_date", "Date"), ("report_type", "Type"), ("title", "Title"), ("workforce", "Workforce"), ("progress", "Progress %"), ("weather", "Weather"), ("summary", "Summary"), ("next_steps", "Next steps"), ("created_by_name", "By")],
     "Issues": [("project_name", "Project"), ("title", "Title"), ("category", "Category"), ("severity", "Severity"), ("owner", "Owner"), ("due_date", "Due"), ("status", "Status"), ("description", "Description")],
@@ -60,6 +60,9 @@ def build_pdf(data):
             story.append(PageBreak())
         story += [Paragraph(f"{p.get('code', '')} — {p.get('name', '')}", h2),
                   Paragraph(f"{p.get('location', '')} · Client: {p.get('client', '') or '—'} · Status: {p.get('status', '')} · <b>{p.get('progress', 0)}% complete</b> ({p.get('progress_mode', 'manual')} basis)", meta)]
+        if p.get("planned_progress") is not None:
+            v = p["schedule_variance"]
+            story.append(Paragraph(f"Schedule {p.get('start_date')} → {p.get('end_date')} · Planned today {p['planned_progress']}% · Actual {p['progress']}% · <b>{'+' if v >= 0 else ''}{v}% {'ahead of' if v >= 0 else 'behind'} plan</b>", meta))
         if p.get("summary"):
             story += [Spacer(1, 4), Paragraph(p["summary"], cell)]
         for key, widths in (("activities", [0, 52, 30, 14, 18, 26, 22]), ("reports", [0, 20, 14, 30, 14, 14, 0, 50, 0, 0]), ("issues", [0, 40, 18, 16, 26, 20, 18, 40])):

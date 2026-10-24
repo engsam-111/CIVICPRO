@@ -1,9 +1,11 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Query
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Query, Request, BackgroundTasks
+from pymongo.errors import DuplicateKeyError
+import hmac
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ReturnDocument
+from pymongo import ReturnDocument, UpdateOne
 from pydantic import BaseModel, Field
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -15,6 +17,8 @@ load_dotenv(Path(__file__).parent / '.env')
 from clerk_auth import clerk_router, require_user  # noqa: E402
 from storage import init_storage, put_object, get_object, APP_NAME  # noqa: E402
 from exports import build_pdf, build_xlsx  # noqa: E402
+from mailer import send_email, overdue_email  # noqa: E402
+from schedule import planned_at, build_curve  # noqa: E402
 
 logger = logging.getLogger("civicpro")
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
@@ -36,6 +40,8 @@ class ProjectIn(BaseModel):
     progress: int = Field(ge=0, le=100, default=0)
     status: ProjectStatus = "Active"
     summary: str = ""
+    start_date: str = ""
+    end_date: str = ""
 
 
 class ProjectPatch(BaseModel):
@@ -46,6 +52,8 @@ class ProjectPatch(BaseModel):
     progress: Optional[int] = Field(default=None, ge=0, le=100)
     status: Optional[ProjectStatus] = None
     summary: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class ActivityIn(BaseModel):
@@ -96,6 +104,7 @@ class IssueIn(BaseModel):
     category: Literal["Issue", "Risk", "Struggle"] = "Issue"
     severity: Literal["High", "Medium", "Low"] = "Medium"
     owner: str = "Unassigned"
+    owner_id: str = ""
     due_date: str = ""
     status: Literal["Open", "In progress", "Resolved"] = "Open"
     description: str = ""
@@ -105,6 +114,7 @@ class IssuePatch(BaseModel):
     title: Optional[str] = None
     severity: Optional[Literal["High", "Medium", "Low"]] = None
     owner: Optional[str] = None
+    owner_id: Optional[str] = None
     due_date: Optional[str] = None
     status: Optional[Literal["Open", "In progress", "Resolved"]] = None
     description: Optional[str] = None
@@ -168,6 +178,7 @@ async def _project(pid):
 async def _with_progress(projects):
     acts = await db.activities.find({"project_id": {"$in": [p["id"] for p in projects]}}, {"_id": 0, "project_id": 1, "progress": 1, "weight": 1}).to_list(10000)
     by = {}
+    today = datetime.now(timezone.utc).date()
     for a in acts:
         by.setdefault(a["project_id"], []).append(a)
     for p in projects:
@@ -178,6 +189,11 @@ async def _with_progress(projects):
         if items:
             total = sum(a.get("weight", 1) for a in items)
             p["progress"] = round(sum(a["progress"] * a.get("weight", 1) for a in items) / total)
+        planned = planned_at(p.get("start_date"), p.get("end_date"), today)
+        p["planned_progress"] = planned
+        p["schedule_variance"] = None if planned is None else round(p["progress"] - planned, 1)
+    if projects:
+        await db.progress_snapshots.bulk_write([UpdateOne({"project_id": p["id"], "date": today.isoformat()}, {"$set": {"progress": p["progress"], "updated_at": now()}}, upsert=True) for p in projects])
     return projects
 
 
@@ -245,8 +261,20 @@ async def projects(member=Depends(current_member)):
     return await _with_progress(await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000))
 
 
+def _check_dates(start, end):
+    for v in (start, end):
+        if v:
+            try:
+                datetime.fromisoformat(v)
+            except ValueError:
+                raise HTTPException(422, "Dates must be YYYY-MM-DD")
+    if start and end and end <= start:
+        raise HTTPException(422, "Finish date must be after start date")
+
+
 @api.post("/projects")
 async def create_project(body: ProjectIn, member=Depends(current_member)):
+    _check_dates(body.start_date, body.end_date)
     return await _create("projects", body, member)
 
 
@@ -257,8 +285,17 @@ async def project_detail(pid: str, member=Depends(current_member)):
     return {"project": project, "activities": await _list("activities", pid), "reports": await _list("reports", pid, True), "issues": await _list("issues", pid, True), "files": files}
 
 
+@api.get("/projects/{pid}/curve")
+async def project_curve(pid: str, member=Depends(current_member)):
+    project = (await _with_progress([await _project(pid)]))[0]
+    snaps = await db.progress_snapshots.find({"project_id": pid}, {"_id": 0}).to_list(5000)
+    return build_curve(project, snaps, datetime.now(timezone.utc).date()) or {"points": [], "missing_dates": True}
+
+
 @api.patch("/projects/{pid}")
 async def update_project(pid: str, body: ProjectPatch, member=Depends(current_member)):
+    current = await _project(pid)
+    _check_dates(body.start_date if body.start_date is not None else current.get("start_date"), body.end_date if body.end_date is not None else current.get("end_date"))
     return await _update("projects", pid, body)
 
 
@@ -320,12 +357,84 @@ async def issues(project_id: Optional[str] = None, member=Depends(current_member
 
 @api.post("/issues")
 async def create_issue(body: IssueIn, member=Depends(current_member)):
+    if body.owner_id:
+        body.owner = await _owner_name(body.owner_id)
     return await _create("issues", body, member)
 
 
 @api.patch("/issues/{iid}")
 async def update_issue(iid: str, body: IssuePatch, member=Depends(current_member)):
-    return await _update("issues", iid, body)
+    if body.owner_id:
+        body.owner = await _owner_name(body.owner_id)
+    elif body.owner_id == "":
+        body.owner = body.owner or "Unassigned"
+    doc = await _update("issues", iid, body)
+    if body.due_date is not None or body.owner_id is not None:
+        await db.issues.update_one({"id": iid}, {"$unset": {"reminder_sent_at": ""}})
+        doc.pop("reminder_sent_at", None)
+    return doc
+
+
+async def _owner_name(user_id):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    if not u:
+        raise HTTPException(404, "Team member not found")
+    return u.get("name") or u.get("email") or "Team member"
+
+
+@api.get("/team")
+async def team(member=Depends(current_member)):
+    return await db.users.find({}, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1}).sort("name", 1).to_list(1000)
+
+
+async def _run_overdue_reminders(app_url):
+    yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+    window = (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat()
+    issues = await db.issues.find({"status": {"$ne": "Resolved"}, "due_date": {"$gte": window, "$lte": yesterday, "$ne": ""}, "reminder_sent_at": {"$exists": False}}, {"_id": 0}).to_list(1000)
+    if not issues:
+        return 0
+    names = {p["id"]: p["name"] for p in await db.projects.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
+    managers = [m for m in await db.users.find({"role": {"$in": ["manager", "admin"]}}, {"_id": 0}).to_list(100) if m.get("email")]
+    sent = 0
+    for issue in issues:
+        pname = names.get(issue["project_id"], "Unknown project")
+        owner = await db.users.find_one({"user_id": issue["owner_id"]}, {"_id": 0}) if issue.get("owner_id") else None
+        ok = False
+        if owner and owner.get("email"):
+            subject, html = overdue_email(issue, pname, owner.get("name") or "there", app_url, for_manager=False)
+            ok = bool(await send_email(to=[owner["email"]], subject=subject, html=html))
+        cc = [m["email"] for m in managers if not owner or m["email"] != owner.get("email")]
+        if cc:
+            subject, html = overdue_email(issue, pname, "team", app_url, for_manager=True)
+            ok = bool(await send_email(to=cc, subject=subject, html=html)) or ok
+        if ok:
+            sent += 1
+            await db.issues.update_one({"id": issue["id"]}, {"$set": {"reminder_sent_at": now()}})
+    logger.info(f"Overdue reminders sent for {sent}/{len(issues)} issues")
+    return sent
+
+
+@api.post("/cron/overdue-reminders")
+async def cron_overdue(request: Request, background: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    auth = request.headers.get("authorization", "")
+    secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    if not secret or not auth.startswith("Bearer ") or not hmac.compare_digest(auth[7:], secret):
+        raise HTTPException(401, "Unauthorized")
+    try:
+        envelope = await request.json()
+    except ValueError:
+        envelope = None
+    if envelope is not None and not isinstance(envelope, dict):
+        raise HTTPException(400, "Invalid body")
+    run_id = request.headers.get("x-webhook-id") or (envelope or {}).get("run_id") or str(uuid.uuid4())
+    try:
+        await db.cron_runs.insert_one({"run_id": run_id, "job": "overdue-reminders", "created_at": now()})
+    except DuplicateKeyError:
+        return {"status": "duplicate"}
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    background.add_task(_run_overdue_reminders, f"https://{host.split(',')[0].strip()}" if host else "")
+    return {"status": "accepted", "run_id": run_id}
 
 
 @api.delete("/issues/{iid}")
@@ -457,6 +566,8 @@ app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.envi
 
 @app.on_event("startup")
 async def startup():
+    await db.cron_runs.create_index("run_id", unique=True)
+    await db.progress_snapshots.create_index([("project_id", 1), ("date", 1)], unique=True)
     try:
         await run_in_threadpool(init_storage)
     except Exception as e:

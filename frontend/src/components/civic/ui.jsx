@@ -44,7 +44,7 @@ export function Panel({ eyebrow, title, children, actions, testid }) {
 
 export const Loading = ({ label = "Loading project intelligence…" }) => <div className="loading-inline" data-testid="page-loading">{label}</div>;
 export const Empty = ({ children, testid }) => <div className="empty-state" data-testid={testid}>{children}</div>;
-export const Progress = ({ value }) => <div className="progress"><i style={{ width: `${value}%` }} /></div>;
+export const Progress = ({ value, planned }) => <div className="progress"><i style={{ width: `${value}%` }} />{planned != null && <em className="planned-tick" style={{ left: `${planned}%` }} title={`Planned ${planned}%`} />}</div>;
 export const Badge = ({ tone = "slate", children, testid }) => <span className={`badge badge-${tone}`} data-testid={testid}>{children}</span>;
 export const toneFor = v => ({ High: "red", Medium: "amber", Low: "blue", Open: "red", "In progress": "amber", Resolved: "green", "At risk": "red", Active: "green", Completed: "blue", "On hold": "slate", Daily: "blue", Weekly: "amber", "Not started": "slate" }[v] || "slate");
 

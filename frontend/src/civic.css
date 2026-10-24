@@ -63,6 +63,14 @@
 .activity-progress span{font-size:11px;color:#94a3b8}
 .avatar.light{background:#fef3c7;color:#92400e}
 .project-row .badge{margin-right:0}
+.badges{display:inline-flex;gap:4px}
+.progress{position:relative}
+.planned-tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:#0f172a;transform:translateX(-1px)}
+.schedule-panel{margin-bottom:24px}
+.schedule-stats{display:flex;gap:28px;padding:0 24px 6px;flex-wrap:wrap}
+.schedule-stats div span{display:block;font-family:'DM Mono';font-size:10px;color:#94a3b8;letter-spacing:.8px}
+.schedule-stats div b{font-size:22px;letter-spacing:-.5px}
+.schedule-stats .ahead{color:var(--green)}.schedule-stats .behind{color:var(--red)}
 .user-mini small{text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 .record .record-row{cursor:pointer}.record .record-row:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 .record-actions-right{display:flex;gap:14px;align-items:center}

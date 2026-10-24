@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { toast } from "sonner";
-import { uploadFiles, useApi } from "@/lib/api";
+import { uploadFiles, useApi, useResource } from "@/lib/api";
 import { Field, FormModal, Select } from "@/components/civic/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -33,6 +33,8 @@ export function ProjectForm({ close, onSaved, project }) {
     <Field name="client" label="Client" placeholder="Client / authority" required={false} defaultValue={p.client} />
     <Field name="progress" label={p.progress_mode === "activity" ? "Manual progress % (activities override)" : "Progress %"} type="number" min={0} max={100} placeholder="0" required={false} defaultValue={p.manual_progress ?? p.progress} />
     <Select name="status" label="Status" options={["Active", "At risk", "On hold", "Completed"]} defaultValue={p.status || "Active"} />
+    <Field name="start_date" label="Planned start" type="date" required={false} defaultValue={p.start_date} />
+    <Field name="end_date" label="Planned finish" type="date" required={false} defaultValue={p.end_date} />
     <Field name="summary" label="Project summary" type="textarea" full required={false} placeholder="Scope, current stage, key notes…" defaultValue={p.summary} />
   </FormModal>;
 }
@@ -67,8 +69,9 @@ export function ReportForm({ close, onSaved, projects, projectId, report: edit }
 export function IssueForm({ close, onSaved, projects, projectId }) {
   const api = useApi();
   const files = useRef(null);
+  const [team] = useResource("/team");
   const submit = async f => {
-    const issue = await api("post", "/issues", f);
+    const issue = await api("post", "/issues", { ...f, owner: f.owner_id ? undefined : "Unassigned" });
     const picked = Array.from(files.current?.files || []);
     await attach(api, picked, { project_id: issue.project_id, entity_type: "issue", entity_id: issue.id });
     toast.success("Issue logged");
@@ -79,7 +82,7 @@ export function IssueForm({ close, onSaved, projects, projectId }) {
     <Field name="title" label="Title" placeholder="Concrete delivery delay" full />
     <Select name="category" label="Type" options={["Issue", "Risk", "Struggle"]} testid="issue-category-select" />
     <Select name="severity" label="Severity" options={["High", "Medium", "Low"]} defaultValue="Medium" testid="issue-severity-select" />
-    <Field name="owner" label="Action owner" placeholder="Responsible person" required={false} />
+    <Select name="owner_id" label="Action owner (gets overdue reminder)" required={false} options={[{ value: "", label: "Unassigned — managers only" }, ...(team || []).map(u => ({ value: u.user_id, label: `${u.name || u.email} · ${u.role}` }))]} testid="issue-owner-select" />
     <Field name="due_date" label="Follow-up due" type="date" required={false} />
     <Field name="description" label="Details & action required" type="textarea" full required={false} placeholder="What happened, impact, agreed action…" />
     <FilesField inputRef={files} />

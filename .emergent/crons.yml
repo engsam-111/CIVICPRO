@@ -1,0 +1,8 @@
+crons:
+  - name: overdue-reminders
+    description: "Emails assignees and managers once, the day after an issue's follow-up date passes (07:00 UTC)"
+    cron: "0 7 * * *"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/overdue-reminders"
+    method: POST
+    enabled: true
