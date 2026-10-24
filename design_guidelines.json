@@ -1,0 +1,75 @@
+{
+  "app_title": "CIVICPRO - Civil Engineering Multi-Project Command Center",
+  "app_type": "hybrid_fullstack",
+  "theme": {
+    "mode": "light/dark dual mode with professional engineering aesthetic",
+    "primary_color": "#D97706",
+    "accent_color": "#1E293B",
+    "background_color": "#F8FAFC",
+    "card_background": "#FFFFFF",
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "border_color": "#E2E8F0"
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base text-slate-700 dark:text-slate-300",
+      "small": "text-sm text-slate-500 dark:text-slate-400"
+    }
+  },
+  "color_palette": {
+    "archetype": "Swiss & High-Contrast Industrial Engineering",
+    "colors": {
+      "primary": "#D97706",
+      "primary_hover": "#B45309",
+      "slate_dark": "#0F172A",
+      "slate_light": "#F8FAFC",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "danger": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "component_strategy": {
+    "framework": "React + Tailwind CSS + Shadcn/UI primitives + Recharts + Lucide icons",
+    "styling": "Cardless or sharp 8px border-radius, dense data correlation, high contrast badges, and clean technical engineering workspace aesthetics."
+  },
+  "grids": {
+    "marketing_bento": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8",
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
+  },
+  "motion": {
+    "transition_rules": "transition: transform 0.2s ease, opacity 0.2s ease; no universal all transitions.",
+    "hover_effects": "hover:-translate-y-0.5 transition-all duration-200"
+  },
+  "image_urls": [
+    {
+      "category": "Project Hero - Crane & Structure",
+      "url": "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHwyfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwZW5naW5lZXJpbmclMjBwcm9qZWN0fGVufDB8fHx8MTc5Mjg3MzE0NXww&ixlib=rb-4.1.0&q=85",
+      "description": "Yellow crane near building during daytime for hero showcase"
+    },
+    {
+      "category": "Site Activity & Engineering",
+      "url": "https://images.pexels.com/photos/8961260/pexels-photo-8961260.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Two workers discussing plans on a sandy construction site with safety gear"
+    },
+    {
+      "category": "Skyscraper Construction",
+      "url": "https://images.unsplash.com/photo-1485083269755-a7b559a4fe5e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwyfHxidWlsZGluZyUyMGNvbnN0cnVjdGlvbiUyMGJsdWVwcmludCUyMGNyYW5lfGVufDB8fHx8MTc5Mjg3MzE0NXww&ixlib=rb-4.1.0&q=85",
+      "description": "Several cranes above buildings for project portfolio cover"
+    }
+  ],
+  "accessibility": {
+    "contrast_standards": "APCA and WCAG AA compliant (minimum 4.5:1 text, 3:1 interactive elements)",
+    "focus_states": "Visible focus ring with high contrast and ring-2 ring-amber-500",
+    "aria_labels": "All interactive buttons, dialogs, and tables include aria-label and data-testid attributes"
+  },
+  "instructions_to_main_agent": "Ensure all interactive elements have data-testid attributes. Implement multi-project workspace switching, Gantt timeline tracking, daily/weekly site reporting with struggle and risk assessment, photo/document attachments, and exportable PDF/CSV reports. Follow Swiss engineering high-contrast aesthetic with Outfit and Inter fonts."
+}

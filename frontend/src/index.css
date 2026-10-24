@@ -1,0 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--paper:#f6f8fb;--amber:#d97706;--blue:#2563eb;--red:#dc2626;--green:#059669}
+*{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font-family:'Outfit',sans-serif;-webkit-font-smoothing:antialiased}button,input,textarea{font:inherit}button{cursor:pointer}::selection{background:#fbbf24;color:#0f172a}
