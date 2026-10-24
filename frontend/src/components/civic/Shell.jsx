@@ -1,9 +1,9 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/react";
-import { FileText, FolderKanban, LayoutDashboard, ShieldAlert, Users } from "lucide-react";
+import { FileText, FolderKanban, LayoutDashboard, ShieldAlert, Sparkles, Users } from "lucide-react";
 import { useMe } from "@/lib/api";
 
-const NAV = [{ to: "/", label: "Overview", icon: LayoutDashboard }, { to: "/projects", label: "Projects", icon: FolderKanban }, { to: "/reports", label: "Site reports", icon: FileText }, { to: "/issues", label: "Issues & risks", icon: ShieldAlert }];
+const NAV = [{ to: "/", label: "Overview", icon: LayoutDashboard }, { to: "/projects", label: "Projects", icon: FolderKanban }, { to: "/reports", label: "Site reports", icon: FileText }, { to: "/issues", label: "Issues & risks", icon: ShieldAlert }, { to: "/assistant", label: "AI assistant", icon: Sparkles }];
 const initials = (name = "") => name.split(" ").map(x => x[0]).join("").slice(0, 2).toUpperCase() || "CP";
 
 export default function Shell() {

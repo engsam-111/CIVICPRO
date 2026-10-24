@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 import { uploadFiles, useApi, useResource } from "@/lib/api";
 import { Field, FormModal, Select } from "@/components/civic/ui";
+import { AiDraft } from "@/components/civic/AiTools";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const projectOptions = projects => [{ value: "", label: "Choose a project" }, ...projects.map(p => ({ value: p.id, label: `${p.code} · ${p.name}` }))];
@@ -55,6 +56,7 @@ export function ReportForm({ close, onSaved, projects, projectId, report: edit }
   return <FormModal title={edit ? "Edit site report" : "New site report"} close={close} onSubmit={submit} submitLabel={edit ? "Save changes" : "Submit report"} testid="save-report-button">
     {!edit && <Select name="project_id" label="Project" full options={projectOptions(projects)} defaultValue={projectId || ""} testid="report-project-select" />}
     <Select name="report_type" label="Report type" options={["Daily", "Weekly"]} defaultValue={r.report_type} testid="report-type-select" />
+    {!edit && <AiDraft />}
     <Field name="report_date" label="Report date" type="date" defaultValue={r.report_date || today()} />
     <Field name="title" label="Report title" placeholder="Morning site walk" full defaultValue={r.title} />
     <Field name="workforce" label="Workforce on site" type="number" min={0} placeholder="24" required={false} defaultValue={r.workforce} />

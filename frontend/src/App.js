@@ -9,6 +9,7 @@ import Projects from "@/pages/Projects";
 import ProjectDetail from "@/pages/ProjectDetail";
 import RecordsPage from "@/pages/RecordsPage";
 import Team from "@/pages/Team";
+import Assistant from "@/pages/Assistant";
 import "@/App.css";
 import "@/civic.css";
 
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/reports" element={<RecordsPage key="reports" type="reports" />} />
         <Route path="/issues" element={<RecordsPage key="issues" type="issues" />} />
         <Route path="/team" element={<Team />} />
+        <Route path="/assistant" element={<Assistant />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes></ClerkAuthProvider></BrowserRouter>;

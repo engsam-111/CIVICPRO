@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, FileText, Pencil, ShieldAlert, Trash2 } from "lucide-react";
 import { ReportForm } from "@/components/civic/forms";
+import { AiSuggest } from "@/components/civic/AiTools";
 import { toast } from "sonner";
 import { errorText, useApi } from "@/lib/api";
 import { AttachmentList, Uploader } from "@/components/civic/Attachments";
@@ -65,6 +66,7 @@ export function IssueList({ issues, reload }) {
       meta={<>{i.project_name} · <Badge tone={toneFor(i.severity)}>{i.severity}</Badge> {i.category} · {i.owner || "Unassigned"}{overdue && <Badge tone="red" testid={`overdue-${i.id}`}>Overdue</Badge>}{i.reminder_sent_at && <Badge tone="slate" testid={`reminded-${i.id}`}>Reminder sent {i.reminder_sent_at.slice(0, 10)}</Badge>}</>}
       right={<StatusSelect issue={i} reload={reload} />} date={i.due_date ? `Due ${i.due_date}` : i.created_at.slice(0, 10)}>
       <div className="detail-grid"><div><span>Details & action</span><p>{i.description || "No details added."}</p></div><div><span>Logged by</span><p>{i.created_by_name || "Team member"} · {i.created_at.slice(0, 10)}</p></div></div>
+      <AiSuggest issue={i} reload={reload} />
       <AttachmentList files={i.files} onChange={reload} />
       <div className="record-actions"><Uploader target={{ project_id: i.project_id, entity_type: "issue", entity_id: i.id }} onDone={reload} testid={`issue-${i.id}-upload`} /><Remove url={`/issues/${i.id}`} label="issue" onDone={reload} testid={`delete-issue-${i.id}`} /></div>
     </Row>;

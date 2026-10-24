@@ -19,6 +19,7 @@ from storage import init_storage, put_object, get_object, APP_NAME  # noqa: E402
 from exports import build_pdf, build_xlsx  # noqa: E402
 from mailer import send_email, overdue_email  # noqa: E402
 from schedule import planned_at, build_curve  # noqa: E402
+from ai import build_ai_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("civicpro")
@@ -566,6 +567,7 @@ async def set_role(user_id: str, body: RolePatch, member=Depends(require_manager
 
 
 app.include_router(api)
+app.include_router(build_ai_router(db, current_member, _with_progress))
 app.include_router(clerk_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
 
