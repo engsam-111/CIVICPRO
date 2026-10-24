@@ -63,5 +63,8 @@
 .activity-progress span{font-size:11px;color:#94a3b8}
 .avatar.light{background:#fef3c7;color:#92400e}
 .project-row .badge{margin-right:0}
+.user-mini small{text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.record .record-row{cursor:pointer}.record .record-row:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+.record-actions-right{display:flex;gap:14px;align-items:center}
 @media(max-width:1000px){.chart-grid{grid-template-columns:1fr}.activity-row{grid-template-columns:1fr 1fr;}.activity-row .record-main{grid-column:1/-1}}
-@media(max-width:680px){.record-row{grid-template-columns:35px 1fr auto}.record-body{padding:4px 15px 18px}.chips{margin-left:0;width:100%}.toolbar-select{width:100%}.tab-action{width:100%;margin:8px 0}.hero-progress strong{font-size:38px}.heading-actions{flex-wrap:wrap}.record-actions{flex-direction:column;align-items:flex-start}.team-row{grid-template-columns:34px 1fr;}.team-row select{grid-column:1/-1}}
+@media(max-width:680px){.record-row{grid-template-columns:35px 1fr auto}.record-body{padding:4px 15px 18px}.chips{margin-left:0;width:100%}.toolbar-select{width:100%}.tab-action{width:100%;margin:8px 0}.hero-progress strong{font-size:38px}.heading-actions{flex-wrap:wrap}.record-actions{flex-direction:column;align-items:flex-start}.team-row{grid-template-columns:34px 1fr;}.team-row select{grid-column:1/-1}.record .record-row{grid-template-columns:35px 1fr;row-gap:8px}.record .record-status,.record .record-date{grid-column:2;justify-content:flex-start;text-align:left}.record .record-date{display:flex;white-space:nowrap}.record-main small{line-height:1.7}}

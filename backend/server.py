@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 from dotenv import load_dotenv
@@ -79,6 +79,17 @@ class ReportIn(BaseModel):
     progress: int = Field(ge=0, le=100, default=0)
 
 
+class ReportPatch(BaseModel):
+    title: Optional[str] = None
+    report_type: Optional[Literal["Daily", "Weekly"]] = None
+    report_date: Optional[str] = None
+    summary: Optional[str] = None
+    next_steps: Optional[str] = None
+    weather: Optional[str] = None
+    workforce: Optional[int] = Field(default=None, ge=0)
+    progress: Optional[int] = Field(default=None, ge=0, le=100)
+
+
 class IssueIn(BaseModel):
     project_id: str
     title: str = Field(min_length=1)
@@ -108,12 +119,16 @@ def _clean(doc):
     return doc
 
 
+def _admin_emails():
+    return {e.strip().lower() for e in os.environ.get("ADMIN_EMAIL", "").split(",") if e.strip()}
+
+
 def _clerk_profile(user_id):
     r = requests.get(f"https://api.clerk.com/v1/users/{user_id}", timeout=10, headers={"Authorization": f"Bearer {os.environ['CLERK_SECRET_KEY']}", "User-Agent": "emergent-app"})
     r.raise_for_status()
     u = r.json()
     primary = next((e for e in u["email_addresses"] if e["id"] == u.get("primary_email_address_id")), (u["email_addresses"] or [{}])[0])
-    admins = {e.strip().lower() for e in os.environ.get("ADMIN_EMAIL", "").split(",") if e.strip()}
+    admins = _admin_emails()
     is_admin = any(e["email_address"].lower() in admins and (e.get("verification") or {}).get("status") == "verified" for e in u["email_addresses"])
     name = " ".join(x for x in [u.get("first_name"), u.get("last_name")] if x) or primary.get("email_address", "Team member").split("@")[0]
     return {"email": primary.get("email_address", ""), "name": name, "is_admin": is_admin}
@@ -179,10 +194,10 @@ async def _enrich(docs, with_files=False):
     return docs
 
 
-async def _list(coll, project_id=None, with_files=False, since=None):
+async def _list(coll, project_id=None, with_files=False, since=None, since_field="created_at"):
     q = {"project_id": project_id} if project_id else {}
     if since:
-        q["created_at"] = {"$gte": since}
+        q[since_field] = {"$gte": since}
     docs = await db[coll].find(q, {"_id": 0}).sort("created_at", -1).to_list(5000)
     return await _enrich(docs, with_files)
 
@@ -288,6 +303,11 @@ async def create_report(body: ReportIn, member=Depends(current_member)):
     return await _create("reports", body, member)
 
 
+@api.patch("/reports/{rid}")
+async def update_report(rid: str, body: ReportPatch, member=Depends(current_member)):
+    return await _update("reports", rid, body)
+
+
 @api.delete("/reports/{rid}")
 async def delete_report(rid: str, member=Depends(current_member)):
     return await _delete("reports", rid)
@@ -381,7 +401,7 @@ async def dashboard(member=Depends(current_member)):
         "projects": projects,
         "kpis": {
             "avg_progress": round(sum(p["progress"] for p in projects) / len(projects)) if projects else 0,
-            "projects": len(projects), "at_risk": sum(p.get("status") == "At risk" for p in projects), "on_track": sum(p.get("status") in ("Active", "Completed") for p in projects),
+            "projects": sum(p.get("status") in ("Active", "At risk") for p in projects), "at_risk": sum(p.get("status") == "At risk" for p in projects), "on_track": sum(p.get("status") in ("Active", "Completed") for p in projects),
             "open_issues": len(open_issues), "high_open": sum(i.get("severity") == "High" for i in open_issues),
             "overdue": sum(bool(i.get("due_date")) and i["due_date"] < today.isoformat() for i in open_issues),
             "reports_week": sum((r.get("report_date") or r["created_at"][:10]) >= week_start.isoformat() for r in reports), "reports_total": len(reports),
@@ -393,11 +413,11 @@ async def dashboard(member=Depends(current_member)):
 
 
 @api.get("/export")
-async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] = None, days: Optional[int] = None, member=Depends(current_member)):
+async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] = None, days: Optional[int] = Query(default=None, ge=1, le=366), member=Depends(current_member)):
     projs = [await _project(project_id)] if project_id else await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
     projs = await _with_progress(projs)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat() if days else None
-    data = {"projects": projs, "activities": await _list("activities", project_id), "reports": await _list("reports", project_id, since=since), "issues": await _list("issues", project_id, since=since)}
+    since = (datetime.now(timezone.utc).date() - timedelta(days=days - 1)).isoformat() if days else None
+    data = {"projects": projs, "activities": await _list("activities", project_id), "reports": await _list("reports", project_id, since=since, since_field="report_date"), "issues": await _list("issues", project_id, since=since)}
     if days:
         data["issues"] += [i for i in await _list("issues", project_id) if i.get("status") != "Resolved" and i["id"] not in {x["id"] for x in data["issues"]}]
     scope = projs[0]["name"] if project_id else "Portfolio"
@@ -421,6 +441,9 @@ async def users(member=Depends(require_manager)):
 async def set_role(user_id: str, body: RolePatch, member=Depends(require_manager)):
     if user_id == member["user_id"] and body.role != "manager":
         raise HTTPException(400, "You cannot remove your own manager role")
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
+    if target and (target.get("email") or "").lower() in _admin_emails() and body.role != "manager":
+        raise HTTPException(400, "The workspace owner must stay a manager")
     doc = await db.users.find_one_and_update({"user_id": user_id}, {"$set": {"role": body.role}}, projection={"_id": 0, "env": 0}, return_document=ReturnDocument.AFTER)
     if not doc:
         raise HTTPException(404, "User not found")

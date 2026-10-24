@@ -16,11 +16,16 @@ function ActivityRow({ a, reload }) {
     try { await api("patch", `/activities/${a.id}`, patch); reload(); }
     catch (e) { toast.error(errorText(e, "Could not update activity")); }
   };
-  const remove = async () => { if (window.confirm("Delete this activity?")) { await api("delete", `/activities/${a.id}`); toast.success("Activity deleted"); reload(); } };
+  const commit = () => progress !== a.progress && save({ progress, ...(progress === 100 ? { status: "Completed" } : {}) });
+  const remove = async () => {
+    if (!window.confirm("Delete this activity?")) return;
+    try { await api("delete", `/activities/${a.id}`); toast.success("Activity deleted"); reload(); }
+    catch (e) { toast.error(errorText(e, "Could not delete activity")); }
+  };
   return <div className="activity-row" data-testid={`activity-${a.id}`}>
     <div className="record-main"><b>{a.name}</b><small>{a.owner || "Unassigned"} · weight {a.weight}{a.due_date ? ` · due ${a.due_date}` : ""}</small></div>
-    <div className="activity-progress"><input type="range" min={0} max={100} step={5} value={progress} onChange={e => setProgress(Number(e.target.value))} onMouseUp={() => save({ progress, ...(progress === 100 ? { status: "Completed" } : {}) })} onTouchEnd={() => save({ progress })} data-testid={`activity-progress-${a.id}`} />
-      <input type="number" min={0} max={100} value={progress} onChange={e => setProgress(Math.min(100, Math.max(0, Number(e.target.value))))} onBlur={() => progress !== a.progress && save({ progress })} data-testid={`activity-progress-input-${a.id}`} /><span>%</span></div>
+    <div className="activity-progress"><input type="range" min={0} max={100} step={5} value={progress} onChange={e => setProgress(Number(e.target.value))} onMouseUp={commit} onTouchEnd={commit} onKeyUp={commit} data-testid={`activity-progress-${a.id}`} />
+      <input type="number" min={0} max={100} value={progress} onChange={e => setProgress(Math.min(100, Math.max(0, Number(e.target.value))))} onBlur={commit} data-testid={`activity-progress-input-${a.id}`} /><span>%</span></div>
     <select className={`status-select tone-${toneFor(a.status)}`} value={a.status} onChange={e => save({ status: e.target.value, ...(e.target.value === "Completed" ? { progress: 100 } : {}) })} data-testid={`activity-status-${a.id}`}>{["Not started", "In progress", "Completed"].map(s => <option key={s}>{s}</option>)}</select>
     <button className="icon-btn small" onClick={remove} aria-label="Delete activity" data-testid={`delete-activity-${a.id}`}><Trash2 size={14} /></button>
   </div>;
@@ -39,7 +44,11 @@ export default function ProjectDetail() {
   if (!d) return <Loading />;
   const p = d.project;
   const counts = { activities: d.activities.length, reports: d.reports.length, issues: d.issues.filter(i => i.status !== "Resolved").length, files: d.files.length };
-  const removeProject = async () => { if (!window.confirm(`Delete ${p.name} and all its records?`)) return; await api("delete", `/projects/${p.id}`); toast.success("Project deleted"); navigate("/projects"); };
+  const removeProject = async () => {
+    if (!window.confirm(`Delete ${p.name} and all its records?`)) return;
+    try { await api("delete", `/projects/${p.id}`); toast.success("Project deleted"); navigate("/projects"); }
+    catch (e) { toast.error(errorText(e, "Could not delete project")); }
+  };
   const add = { activities: "activity", reports: "report", issues: "issue" }[tab];
   return <div className="content">
     <button className="text-btn back" onClick={() => navigate("/projects")} data-testid="back-to-projects"><ArrowLeft size={14} /> All projects</button>

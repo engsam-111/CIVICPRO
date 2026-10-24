@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FileText, Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { errorText, uploadFiles, useApi } from "@/lib/api";
+import { errorText, saveBlob, uploadFiles, useApi } from "@/lib/api";
 
 const kb = n => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -20,10 +20,15 @@ export function AttachmentList({ files = [], onChange }) {
   const api = useApi();
   const open = async f => {
     const win = window.open("", "_blank");
-    try { const blob = await api("get", `/files/${f.id}/download`, null, { responseType: "blob" }); win.location.href = URL.createObjectURL(blob); }
-    catch { win?.close(); toast.error("Could not open file"); }
+    try {
+      const blob = await api("get", `/files/${f.id}/download`, null, { responseType: "blob" });
+      if (win) win.location.href = URL.createObjectURL(blob); else saveBlob(blob, f.original_filename);
+    } catch { win?.close(); toast.error("Could not open file"); }
   };
-  const remove = async f => { await api("delete", `/files/${f.id}`); toast.success("Attachment removed"); onChange?.(); };
+  const remove = async f => {
+    try { await api("delete", `/files/${f.id}`); toast.success("Attachment removed"); onChange?.(); }
+    catch (e) { toast.error(errorText(e, "Could not remove attachment")); }
+  };
   if (!files.length) return <p className="muted-note" data-testid="no-attachments">No photos or documents attached yet.</p>;
   return <div className="attachments" data-testid="attachment-list">{files.map(f => <div className="attachment" key={f.id} data-testid={`attachment-${f.id}`}>
     <button type="button" className="attachment-thumb" onClick={() => open(f)} data-testid={`open-attachment-${f.id}`}><Thumb file={f} /></button>

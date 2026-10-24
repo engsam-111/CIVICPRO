@@ -1,0 +1,42 @@
+{
+  "summary": "First signed-in E2E run of CIVICPRO. Backend: 22/22 pytest pass (auth 401s, 422 validation, projects CRUD, weighted activity progress, reports Daily/Weekly, issues + status, file upload/download/delete to project and report, dashboard aggregate, PDF/XLSX export portfolio + project, team role 403/200/400/404). Frontend (Playwright, Clerk real sign-in for manager and engineer, verification code 424242 was prompted): dashboard KPIs/3 charts/project health/feed, create project from dashboard and /projects, project detail tabs, add activities -> weighted % (75% -> 85% via number input blur -> 100% via status Completed) and 'Calculated from 2 weighted activities', edit project status/summary, delete project with confirm (cancel + accept), files tab upload (image thumbnail + txt), open attachment in new tab (blob), delete attachment, reports with attachments from detail/dashboard/reports page, expanded row details + in-row uploader, filters + project filter, issues with severity/category/due date + attachment, overdue badge, status change, open/resolved filters, exports (daily/weekly/full pdf/xlsx) on dashboard and project detail downloaded with valid %PDF / PK headers, Team page role change persists, engineer: no Team nav, /team redirects to /, can create/edit projects and issues, sign-out returns to /sign-in, session survives reload. No functional bugs found; only minor UX/code-quality items.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/export?days=1|7", "issue": "Daily/weekly window filters on created_at, not report_date; a back-dated report submitted today appears in the 'Daily' PDF, a report dated today but entered yesterday does not."},
+      {"endpoint": "PATCH /api/users/{id}", "issue": "A manager can demote the ADMIN_EMAIL user; current_member only re-applies admin role when the user record has no email, so the demotion sticks. Consider blocking role changes for ADMIN_EMAIL users."},
+      {"endpoint": "/api/reports", "issue": "No PATCH endpoint for reports, so reports cannot be edited (requirement says everyone can create/edit everything)."},
+      {"endpoint": "GET /api/dashboard", "issue": "KPI 'Active projects' counts all projects incl. On hold/Completed."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Shell sidebar user-mini", "issue": "Email shown with CSS text-transform: capitalize ('Qa.Manager+Clerk_test@Civicpro.Dev'). Remove capitalize from the email <small>.", "selector": ".user-mini small", "priority": "LOW"},
+      {"component": "ProjectDetail tab counts", "issue": "Right after creating an issue, the Issues tab count briefly reads 0 until reload completes (onSaved is not awaited before modal close). Cosmetic.", "selector": "[data-testid='tab-issues']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile 390px issues list", "issues": ["Record row is cramped: date wraps onto 3 lines ('Due / 2025- / 01-01'), and title, meta and status select squeeze into a narrow column. Stack the status/date under the title on small screens."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_civicpro_api.py", "/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Remove text-transform capitalize from the sidebar email",
+    "Improve mobile layout of report/issue rows",
+    "Optional: base the export day window on report_date; protect ADMIN_EMAIL from demotion; add PATCH /api/reports + edit UI"
+  ],
+  "critical_code_review_comments": [
+    "ReportForm/IssueForm: if the record is created but the attachment upload fails, the modal stays open with 'Could not save', and resubmitting creates a duplicate record. Close the modal and show an upload-specific error, or upload to the created id on retry.",
+    "ActivityRow range slider only saves on mouseup/touchend, so keyboard arrow changes on the slider are never saved. onTouchEnd also skips the auto-'Completed' status when progress hits 100.",
+    "Delete handlers (project, activity, report/issue Remove, attachment remove) have no try/catch, so a failed request shows no error toast.",
+    "<select> (issue status) is nested inside the row <button>, which is invalid HTML. It works in Chromium (stopPropagation) but is fragile and hurts accessibility; move it outside the button.",
+    "AttachmentList.open calls window.open('') before the fetch; if popups are blocked, win is null and win.location throws inside try, so the user only sees a generic toast."
+  ],
+  "updated_files": ["/app/backend/tests/test_civicpro_api.py", "/app/memory/test_credentials.md"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows (minor cosmetic issues only)"},
+  "test_credentials": "test_credentials.md was EMPTY at start; I filled it with the manager/engineer accounts from the review request plus their Clerk user_ids.",
+  "seed_data_creation": "Created TEST_ projects TUI-D1, TUI-P1, TUI-E1, TAPI-1 and their activities/reports/issues/files; all were deleted afterwards. The seeded NL-04, RD-11, HA-02 are untouched, except that HA-02 already had data from the main agent. Project ECHO2441 was not created by me and was left in place. Engineer role was changed to supervisor and then back to engineer.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Clerk UI sign-in: fill input[name=identifier], click button.cl-formButtonPrimary, fill input[name=password], click again. A verification code step appears: type 424242. Save storage_state to /tmp/*.json and reuse it in new browser contexts to skip login. Backend pytest mints tokens through /app/scripts/clerk_test_token.py (subprocess). Run: REACT_APP_BACKEND_URL=... pytest /app/backend/tests -v."
+}

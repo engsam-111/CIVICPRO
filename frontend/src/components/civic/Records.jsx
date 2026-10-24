@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown, FileText, ShieldAlert, Trash2 } from "lucide-react";
+import { ChevronDown, FileText, Pencil, ShieldAlert, Trash2 } from "lucide-react";
+import { ReportForm } from "@/components/civic/forms";
 import { toast } from "sonner";
 import { errorText, useApi } from "@/lib/api";
 import { AttachmentList, Uploader } from "@/components/civic/Attachments";
@@ -8,20 +9,30 @@ import { Badge, Empty, toneFor } from "@/components/civic/ui";
 function Row({ id, icon, tone, title, meta, right, date, children, testid }) {
   const [open, setOpen] = useState(false);
   return <div className={`record ${open ? "open" : ""}`} data-testid={testid}>
-    <button type="button" className="record-row" onClick={() => setOpen(!open)} data-testid={`${testid}-toggle`}>
+    <div role="button" tabIndex={0} aria-expanded={open} className="record-row" onClick={() => setOpen(!open)} onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); setOpen(!open); } }} data-testid={`${testid}-toggle`}>
       <div className={`record-symbol ${tone}`}>{icon}</div>
       <div className="record-main"><b>{title}</b><small>{meta}</small></div>
       <span className="record-status">{right}</span>
       <span className="record-date">{date}<ChevronDown size={14} /></span>
-    </button>
+    </div>
     {open && <div className="record-body" data-testid={`${testid}-details`}>{children}</div>}
   </div>;
 }
 
 function Remove({ url, label, onDone, testid }) {
   const api = useApi();
-  const go = async () => { if (!window.confirm(`Delete this ${label}?`)) return; await api("delete", url); toast.success(`${label} deleted`); onDone(); };
+  const go = async () => {
+    if (!window.confirm(`Delete this ${label}?`)) return;
+    try { await api("delete", url); toast.success(`${label} deleted`); onDone(); }
+    catch (e) { toast.error(errorText(e, `Could not delete ${label}`)); }
+  };
   return <button type="button" className="text-btn danger" onClick={go} data-testid={testid}><Trash2 size={13} /> Delete {label}</button>;
+}
+
+function EditReport({ report, reload }) {
+  const [show, setShow] = useState(false);
+  return <><button type="button" className="text-btn" onClick={() => setShow(true)} data-testid={`edit-report-${report.id}`}><Pencil size={13} /> Edit report</button>
+    {show && <ReportForm report={report} close={() => setShow(false)} onSaved={reload} />}</>;
 }
 
 export function ReportList({ reports, reload }) {
@@ -31,7 +42,7 @@ export function ReportList({ reports, reload }) {
     <div className="detail-grid"><div><span>Work completed</span><p>{r.summary}</p></div>{r.next_steps && <div><span>Planned next / blockers</span><p>{r.next_steps}</p></div>}
       {r.weather && <div><span>Conditions</span><p>{r.weather}</p></div>}<div><span>Submitted by</span><p>{r.created_by_name || "Team member"}</p></div></div>
     <AttachmentList files={r.files} onChange={reload} />
-    <div className="record-actions"><Uploader target={{ project_id: r.project_id, entity_type: "report", entity_id: r.id }} onDone={reload} testid={`report-${r.id}-upload`} /><Remove url={`/reports/${r.id}`} label="report" onDone={reload} testid={`delete-report-${r.id}`} /></div>
+    <div className="record-actions"><Uploader target={{ project_id: r.project_id, entity_type: "report", entity_id: r.id }} onDone={reload} testid={`report-${r.id}-upload`} /><div className="record-actions-right"><EditReport report={r} reload={reload} /><Remove url={`/reports/${r.id}`} label="report" onDone={reload} testid={`delete-report-${r.id}`} /></div></div>
   </Row>)}</div>;
 }
 
