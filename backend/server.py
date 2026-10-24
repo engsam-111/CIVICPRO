@@ -80,10 +80,10 @@ class ReportIn(BaseModel):
 
 
 class ReportPatch(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1)
     report_type: Optional[Literal["Daily", "Weekly"]] = None
     report_date: Optional[str] = None
-    summary: Optional[str] = None
+    summary: Optional[str] = Field(default=None, min_length=1)
     next_steps: Optional[str] = None
     weather: Optional[str] = None
     workforce: Optional[int] = Field(default=None, ge=0)
@@ -401,7 +401,7 @@ async def dashboard(member=Depends(current_member)):
         "projects": projects,
         "kpis": {
             "avg_progress": round(sum(p["progress"] for p in projects) / len(projects)) if projects else 0,
-            "projects": sum(p.get("status") in ("Active", "At risk") for p in projects), "at_risk": sum(p.get("status") == "At risk" for p in projects), "on_track": sum(p.get("status") in ("Active", "Completed") for p in projects),
+            "projects": sum(p.get("status") in ("Active", "At risk") for p in projects), "at_risk": sum(p.get("status") == "At risk" for p in projects), "on_track": sum(p.get("status") == "Active" for p in projects),
             "open_issues": len(open_issues), "high_open": sum(i.get("severity") == "High" for i in open_issues),
             "overdue": sum(bool(i.get("due_date")) and i["due_date"] < today.isoformat() for i in open_issues),
             "reports_week": sum((r.get("report_date") or r["created_at"][:10]) >= week_start.isoformat() for r in reports), "reports_total": len(reports),

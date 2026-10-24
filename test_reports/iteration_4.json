@@ -1,0 +1,33 @@
+{
+  "summary": "Regression run for the iteration_3 minor fixes. Backend: 36/36 pytest pass, including the new /app/backend/tests/test_iteration4_fixes.py with 14 tests: report PATCH saves and persists (404 for an unknown id, 422 for a bad type or progress); demoting the ADMIN_EMAIL owner to engineer or supervisor returns 400 and the role stays manager; engineer gets 403; export days=0/367/-1 returns 422 and days=1/366 returns 200; export with days=1 and days=7 uses report_date (today's report is in, a report dated 10 days back is out, the full export has both); dashboard 'Active projects' KPI counts only Active/At risk projects. Frontend (Playwright, manager signed in through Clerk): sidebar email is lowercase (text-transform none). At 390px, issue/report rows stack status and date under the title, the date stays on one line (15px high) and there is no horizontal overflow. The report row is a div[role=button] with aria-expanded; it expands/collapses by click, Enter and Space. The issue status select is not nested in a button and changing it saves the status without expanding the row. 'Edit report' opens the form prefilled (title, workforce, summary, type) with no project select and no file input; saving updates the row in place (title, Weekly, 15 on site). Slider: ArrowRight saved 80 -> 85, End saved 100 and set status Completed. Tab counts: after saving an issue the modal closes with the count already at 2, and the report count goes 0 -> 1 when the modal closes. Smoke: dashboard loads; a report with an attachment created from the dashboard has 1 file; the Excel export downloads a valid PK file. All fixes verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/reports/{id}", "issue": "ReportPatch has no min_length on title/summary, so the API accepts an empty title or summary (the UI blocks this with required fields)."},
+      {"endpoint": "PATCH /api/users/{id}", "issue": "The owner guard checks the stored email only. If the ADMIN_EMAIL user has no db record or email yet, nothing protects them (edge case)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProjectDetail ActivityRow slider", "issue": "After a keyboard save, the row remounts because its key is `${a.id}-${a.progress}`, so the slider loses focus (document.activeElement becomes body). A keyboard user has to re-focus after every arrow press. Use key={a.id} and sync local state with useEffect.", "selector": "[data-testid^='activity-progress-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration4_fixes.py", "/app/backend/tests/test_civicpro_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: key ActivityRow by a.id so the slider keeps keyboard focus after saving",
+    "Optional: add min_length=1 to ReportPatch.title/summary"
+  ],
+  "critical_code_review_comments": [
+    "Dashboard 'Portfolio progress' delta uses on_track (Active + Completed) while 'Active projects' now counts Active + At risk, so the two KPIs use different definitions (e.g. '3 on track' next to '4 active'). Consider aligning them.",
+    "Export daily/weekly: issues are still windowed by created_at, while reports now use report_date. Open issues are always included, so this is acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration4_fixes.py"],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "100% of requested regression flows"},
+  "test_credentials": "Used the manager account from /app/memory/test_credentials.md. A Clerk code step (424242) appeared again.",
+  "seed_data_creation": "Created the TEST_UI4 project (TUI4-1) and the TIT4-* pytest projects with their activities, reports, issues and files. All were deleted. Remaining projects: ECHO2441 (owner's real data, untouched), HA-02, RD-11, NL-04. The owner role is still manager; no roles were changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Clerk sign-in: identifier -> cl-formButtonPrimary -> password -> button -> type 424242 into the one-time-code input. Save storage_state to /tmp/mgr_state.json and open new contexts with page.context.browser.new_context(storage_state=...). Screenshots from new contexts must use absolute paths (/tmp/x.jpg) and are viewed with view_file. Run pytest with REACT_APP_BACKEND_URL exported. The owner engsammy122 actively uses the ECHO2441 project, so do not modify it."
+}

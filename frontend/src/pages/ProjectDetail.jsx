@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import ExportMenu from "@/components/civic/ExportMenu";
 function ActivityRow({ a, reload }) {
   const api = useApi();
   const [progress, setProgress] = useState(a.progress);
+  useEffect(() => setProgress(a.progress), [a.progress]);
   const save = async patch => {
     try { await api("patch", `/activities/${a.id}`, patch); reload(); }
     catch (e) { toast.error(errorText(e, "Could not update activity")); }
@@ -62,7 +63,7 @@ export default function ProjectDetail() {
     <div className="tabs" role="tablist">{TABS.map(t => <button key={t} role="tab" className={tab === t ? "active" : ""} onClick={() => setTab(t)} data-testid={`tab-${t}`}>{t}<i>{counts[t]}</i></button>)}
       <div className="tab-action">{add ? <button className="primary-btn" onClick={() => setModal(add)} data-testid={`add-${add}-button`}><Plus size={16} /> Add {add}</button> : <Uploader target={{ project_id: p.id, entity_type: "project" }} onDone={reload} testid="project-upload" />}</div></div>
     <div className="list-page">
-      {tab === "activities" && (d.activities.length ? <div className="record-list">{d.activities.map(a => <ActivityRow key={`${a.id}-${a.progress}`} a={a} reload={reload} />)}</div> : <Empty testid="activities-empty">No activities yet. Break the project into weighted activities to calculate progress automatically.</Empty>)}
+      {tab === "activities" && (d.activities.length ? <div className="record-list">{d.activities.map(a => <ActivityRow key={a.id} a={a} reload={reload} />)}</div> : <Empty testid="activities-empty">No activities yet. Break the project into weighted activities to calculate progress automatically.</Empty>)}
       {tab === "reports" && <ReportList reports={d.reports} reload={reload} />}
       {tab === "issues" && <IssueList issues={d.issues} reload={reload} />}
       {tab === "files" && <div className="files-pane"><AttachmentList files={d.files} onChange={reload} /></div>}
