@@ -13,7 +13,7 @@ export function ScheduleCurve({ curve }) {
       <Legend iconType="plainline" wrapperStyle={{ fontSize: 11 }} />
       <ReferenceLine x={today} stroke="#0f172a" strokeDasharray="2 3" label={{ value: "Today", fontSize: 10, fill: "#0f172a", position: "insideTopRight" }} />
       <Line type="monotone" dataKey="planned" name="Planned" stroke="#94a3b8" strokeDasharray="6 4" strokeWidth={2} dot={false} />
-      <Line type="stepAfter" dataKey="actual" name="Actual" stroke="#d97706" strokeWidth={2.5} dot={false} connectNulls={false} />
+      <Line type="linear" dataKey="actual" name="Actual" stroke="#d97706" strokeWidth={2.5} dot={{ r: 2.5, fill: "#d97706" }} connectNulls />
     </LineChart></ResponsiveContainer></div>;
 }
 

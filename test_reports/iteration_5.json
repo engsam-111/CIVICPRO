@@ -1,0 +1,43 @@
+{
+  "summary": "Tested Planned vs Actual and Overdue Reminders, backend and frontend. Backend: the new /app/backend/tests/test_iteration5_schedule_reminders.py passes 14/14. The full suite passes 49/49 (the cron run test was deselected to avoid sending more real emails). Date validation: finish before start, or equal dates, returns 422 'Finish date must be after start date'; a bad format returns 422; a PATCH with an end date before the stored start returns 422. GET /api/projects returns planned_progress = smoothstep(start, end, today) and schedule_variance; both are null without dates. GET /curve returns sorted points (start, today and end included), planned 0 to 100 rising steadily, actual null after today, plus planned_today, actual_today, variance and today; without dates it returns {points:[], missing_dates:true}; an unknown project returns 404. Changing activity progress updates actual and variance. The XLSX Projects sheet has Start, Planned %, Variance %; PDF exports work. GET /api/team works for an engineer, returns 401 without a token and has no _id. An issue saved with owner_id gets the member's name; an unknown owner_id returns 404. A PATCH of due_date or owner_id clears reminder_sent_at; a status-only PATCH keeps it; owner_id='' sets 'Unassigned'. Cron: 401 with no auth, a wrong bearer, or a missing 'Bearer ' prefix; returns accepted, and the same X-Webhook-Id returns duplicate. In one real run, only the open issue due yesterday got reminder_sent_at; issues due today, in the future, 8 days ago (outside the window), with no due date, or resolved were skipped. A second real run did not re-send (timestamp unchanged). The backend error log shows no email failures. That made 2 real runs; only 1 issue was eligible, so the owner got 1 email. Frontend (manager signed in through Clerk): the project form has start and end date inputs; bad dates show the toast and the modal stays open. A project without dates shows schedule-missing; set-schedule-button opens the edit form prefilled; after saving, schedule-panel shows planned-today, actual-today, the schedule-variance badge and a chart with 2 lines and a Today line. Adding an activity at 80 and then changing it to 20 updates actual and variance live. variance-NL-04 '+19.9% vs plan' and the planned tick (left: 48.1%) show on /projects and the dashboard; rows without dates have no badge. The issue owner select lists all members with their roles; the saved issue shows 'QA Engineer'. /issues shows the 'Reminder sent 2026-10-24' badge. Dashboard, reports and issues pages load with no page errors; no horizontal overflow at 390px.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/cron/overdue-reminders (_run_overdue_reminders)", "issue": "logger.info('Overdue reminders sent ...') never shows in the supervisor logs because no logging level is configured for the 'civicpro' logger. There is no record of how many reminders a run sent. Add logging.basicConfig(level=INFO), or save sent/total to the cron_runs document."},
+      {"endpoint": "_check_dates", "issue": "datetime.fromisoformat accepts other formats (e.g. '20260301', '2026-03-01T10:00'), but the order check then compares raw strings. A non-YYYY-MM-DD value can pass validation with the order compared wrongly. Compare parsed dates, or require a strict YYYY-MM-DD regex."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SchedulePanel stats (civic.css)", "issue": "FIXED by testing agent. The rule '.schedule-stats div span' (10px grey mono label style) also matched the spans that the preview visual-edit tool wraps around dynamic text. The numbers (90.6, 20, -70.6, the dates) rendered as tiny grey text next to a large '%'. Changed the selector to '.schedule-stats div > span'; verified fixed.", "selector": "[data-testid='planned-today']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Project detail S-curve", "issues": [
+        "Actual line is misleading. Snapshots only start when someone first views the project, and build_curve shows actual=0 for every day before the first snapshot. A project that started months ago at 68% shows a flat 0% line from the start date to today, then a spike. The tooltip says 'Actual: 0%' on past dates. Return actual=null before the first snapshot (or start the actual series at the first snapshot), and only use 0 at the start date.",
+        "The SCHEDULE value 'YYYY-MM-DD → YYYY-MM-DD' uses class 'dates', but civic.css has no .dates rule. It renders at the same 22px bold as the KPIs and looks heavy; consider a smaller size.",
+        "The date inputs use the native browser date picker (type=date), the same as the existing report and issue forms."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration5_schedule_reminders.py", "/app/test_reports/pytest/pytest_iter5.xml", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix build_curve so days before the first progress snapshot have actual=null, not 0",
+    "Configure logging (or save results to cron_runs) so overdue reminder runs are visible",
+    "Optional: strict YYYY-MM-DD validation and parsed-date comparison in _check_dates",
+    "Optional: style .schedule-stats .dates smaller"
+  ],
+  "critical_code_review_comments": [
+    "The reminder window is 7 days, so a missed or failed cron day still sends later. If an email fails (ok=False), reminder_sent_at is not set, so it retries the next day, up to 7 days after the due date. This is reasonable, but it differs slightly from 'the day after'.",
+    "If the owner email fails and the manager copy succeeds, ok=True and the owner is never retried. This is acceptable.",
+    "_with_progress writes a progress_snapshots upsert on every GET of /projects, /dashboard, /export and /curve. That is a side effect on reads, but cheap (one doc per project per day). Snapshots exist only for days when someone opened the app, so the actual curve is a step function with gaps.",
+    "PATCH /issues clears reminder_sent_at whenever due_date or owner_id is in the body, even if the value is unchanged. The UI has no issue-edit form today, but a future edit form that always sends due_date would re-arm reminders on every save."
+  ],
+  "updated_files": ["/app/frontend/src/civic.css (.schedule-stats div span -> div > span)", "/app/backend/tests/test_iteration5_schedule_reminders.py"],
+  "success_rate": {"backend": "100% (49/49 suite; cron e2e test 1/1 run separately)", "frontend": "100% of requested flows (1 CSS bug fixed)"},
+  "test_credentials": "Manager qa.manager+clerk_test@civicpro.dev (Clerk code 424242) for the UI; Clerk tokens for the manager and engineer through clerk_test_token.py. No roles were changed.",
+  "seed_data_creation": "Created the TIT5-1, TIT5-2 and TUI5-1 projects with TEST_ issues and activities; all were deleted. 3 TEST- run_ids were added to cron_runs. The main agent's 'TEST reminder issue' on NL-04 was left in place (it shows the reminded badge); delete it when no longer needed. No eligible overdue issues remain, so the 07:00 UTC cron will not email for test data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Real cron runs made by this agent: 2 (only 1 issue was eligible). The cron e2e test in test_iteration5_schedule_reminders.py sends real email to managers (including engsammy122@gmail.com); deselect it in regression runs (--deselect ...::TestCron::test_run_once_and_no_resend). Run pytest with REACT_APP_BACKEND_URL exported; pytest.ini runs xdist (-n). In UI tests, recharts lines animate, so wait about 1.5s before taking screenshots."
+}

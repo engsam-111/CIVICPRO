@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Literal
 from urllib.parse import quote
-import os, uuid, logging, requests
+import os, re, uuid, logging, requests
 
 load_dotenv(Path(__file__).parent / '.env')
 from clerk_auth import clerk_router, require_user  # noqa: E402
@@ -20,6 +20,7 @@ from exports import build_pdf, build_xlsx  # noqa: E402
 from mailer import send_email, overdue_email  # noqa: E402
 from schedule import planned_at, build_curve  # noqa: E402
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("civicpro")
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
@@ -263,9 +264,11 @@ async def projects(member=Depends(current_member)):
 
 def _check_dates(start, end):
     for v in (start, end):
+        if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            raise HTTPException(422, "Dates must be YYYY-MM-DD")
         if v:
             try:
-                datetime.fromisoformat(v)
+                datetime.strptime(v, "%Y-%m-%d")
             except ValueError:
                 raise HTTPException(422, "Dates must be YYYY-MM-DD")
     if start and end and end <= start:
@@ -368,8 +371,9 @@ async def update_issue(iid: str, body: IssuePatch, member=Depends(current_member
         body.owner = await _owner_name(body.owner_id)
     elif body.owner_id == "":
         body.owner = body.owner or "Unassigned"
+    before = await db.issues.find_one({"id": iid}, {"_id": 0, "due_date": 1, "owner_id": 1}) or {}
     doc = await _update("issues", iid, body)
-    if body.due_date is not None or body.owner_id is not None:
+    if (body.due_date is not None and body.due_date != before.get("due_date")) or (body.owner_id is not None and body.owner_id != before.get("owner_id", "")):
         await db.issues.update_one({"id": iid}, {"$unset": {"reminder_sent_at": ""}})
         doc.pop("reminder_sent_at", None)
     return doc
@@ -387,7 +391,7 @@ async def team(member=Depends(current_member)):
     return await db.users.find({}, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1}).sort("name", 1).to_list(1000)
 
 
-async def _run_overdue_reminders(app_url):
+async def _run_overdue_reminders(app_url, run_id=None):
     yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     window = (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat()
     issues = await db.issues.find({"status": {"$ne": "Resolved"}, "due_date": {"$gte": window, "$lte": yesterday, "$ne": ""}, "reminder_sent_at": {"$exists": False}}, {"_id": 0}).to_list(1000)
@@ -411,6 +415,8 @@ async def _run_overdue_reminders(app_url):
             sent += 1
             await db.issues.update_one({"id": issue["id"]}, {"$set": {"reminder_sent_at": now()}})
     logger.info(f"Overdue reminders sent for {sent}/{len(issues)} issues")
+    if run_id:
+        await db.cron_runs.update_one({"run_id": run_id}, {"$set": {"sent": sent, "candidates": len(issues), "finished_at": now()}})
     return sent
 
 
@@ -433,7 +439,7 @@ async def cron_overdue(request: Request, background: BackgroundTasks):
     except DuplicateKeyError:
         return {"status": "duplicate"}
     host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
-    background.add_task(_run_overdue_reminders, f"https://{host.split(',')[0].strip()}" if host else "")
+    background.add_task(_run_overdue_reminders, f"https://{host.split(',')[0].strip()}" if host else "", run_id)
     return {"status": "accepted", "run_id": run_id}
 
 

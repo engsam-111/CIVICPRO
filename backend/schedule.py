@@ -23,18 +23,18 @@ def build_curve(project, snapshots, today):
         return None
     last = max(e, today)
     step = max(1, (last - s).days // 40)
+    snaps = sorted((_d(x["date"]), x["progress"]) for x in snapshots if _d(x["date"]))
     days = [s + timedelta(days=i) for i in range(0, (last - s).days + 1, step)]
-    for extra in (today, e, last):
+    for extra in [today, e, last] + [d for d, _ in snaps]:
         if s <= extra <= last and extra not in days:
             days.append(extra)
     days.sort()
-    snaps = sorted((_d(x["date"]), x["progress"]) for x in snapshots if _d(x["date"]))
     points = []
     for day in days:
         actual = None
         if day <= today:
             prior = [p for d, p in snaps if d <= day]
-            actual = prior[-1] if prior else (0 if day <= (snaps[0][0] if snaps else today) else None)
+            actual = prior[-1] if prior else (0 if day == s else None)
         points.append({"date": day.isoformat(), "planned": planned_at(project["start_date"], project["end_date"], day), "actual": actual})
     planned_today = planned_at(project["start_date"], project["end_date"], today)
     return {"points": points, "planned_today": planned_today, "actual_today": project["progress"], "variance": round(project["progress"] - planned_today, 1), "today": today.isoformat()}
