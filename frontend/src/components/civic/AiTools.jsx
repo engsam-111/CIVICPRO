@@ -50,7 +50,7 @@ export function AiSuggest({ issue, reload }) {
       <ol className="ai-actions">{s.actions.map((a, n) => <li key={n}>{a.action}<small>{a.owner_role} · {a.timeframe}</small></li>)}</ol>
       <div className="ai-apply">
         {s.severity !== issue.severity && <button type="button" className="text-btn" onClick={() => patch({ severity: s.severity }, `Severity set to ${s.severity}`)} data-testid={`ai-apply-severity-${issue.id}`}>Apply severity</button>}
-        <button type="button" className="text-btn" onClick={() => patch({ description: `${issue.description ? issue.description + "\n\n" : ""}Agreed actions:\n${actionsText()}` }, "Actions added to details")} data-testid={`ai-apply-actions-${issue.id}`}>Add actions to details</button>
+        {!(issue.description || "").includes("Agreed actions:") && <button type="button" className="text-btn" onClick={() => patch({ description: `${issue.description ? issue.description + "\n\n" : ""}Agreed actions:\n${actionsText()}` }, "Actions added to details")} data-testid={`ai-apply-actions-${issue.id}`}>Add actions to details</button>}
       </div></>}
   </div>;
 }

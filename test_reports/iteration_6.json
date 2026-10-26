@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the ChatGPT (openai gpt-6-astra via emergentintegrations) features end to end. Backend: the new /app/backend/tests/test_iteration6_ai.py passes 15/15. All 6 AI endpoints return 401 without a token. draft-report returns 422 for notes under 3 chars or a bad report_type and 404 for a bad project. A real draft returned all 6 fields with workforce=18 and weather with rain, parsed correctly. issues/{id}/suggest returns 404 for an unknown id. A real suggestion gave High severity, a rationale and 5 actions, saved to issue.ai_suggestion, with no _id. The chat SSE stream sends session, then many delta events, then done, with no error. The answer cited '[NL-04] Actual progress: 68%'. A follow-up in the same session ('its client') answered 'Metro Works Authority', so context is kept. The session lists 4 messages. The engineer gets 404 on GET and DELETE of the manager's session, cannot post into it, and does not see it in the list. Deleting returns {ok:true}, then 404. An empty message returns 422; an unknown session_id returns 404. Regression: 49/49 earlier tests pass (cron test deselected). Frontend (manager through Clerk): the Draft with AI box shows on the dashboard modal, /reports and the project Reports tab, where the project is prefilled. The button is disabled with empty notes; with no project it shows the toast 'Choose a project first'. With NL-04 it shows 'Drafting…', then fills title, summary, next_steps, weather, workforce=22 and progress=68, with the toast 'Draft ready…'. After an edited title, the report submits and is listed. The Edit report modal has no AI box. Issue AI panel (/issues and the project Issues tab): 'Suggest actions' shows 'Thinking…', then the rationale and 5 actions, and the button becomes Regenerate. The suggestion persists after a page reload. Apply severity changed Low to High, showed a toast, and then hid. 'Add actions to details' appended 'Agreed actions:' to the description. Assistant (nav-ai-assistant to /assistant): 4 starters. The reply streamed (text length grew 11→51→197→…→673). The sidebar session appears. Enter sends and clears the input. The follow-up kept context. New conversation shows the starters again; reopening loads 4 messages; delete removes the session and clears the log. No page errors. One UI bug found and fixed: the assistant message bubble was huge (see ui_bugs).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/ai/draft-report, /api/ai/issues/{id}/suggest (_collect)", "issue": "LLM exceptions (budget exhausted, provider timeout) are not caught, so the user gets a raw 500. Only the JSON parse failure maps to 502. Wrap _collect in try/except and raise HTTPException(502, 'AI unavailable…')."},
+      {"endpoint": "POST /api/ai/chat", "issue": "The user message is saved before streaming. If the client disconnects or the LLM fails before any output, a session is left with a lone user message (e.g. the existing 'Which projects are behind plan?' session, 21:48, has 1 message and no reply). The next turn then sends two user turns in a row."},
+      {"endpoint": "/api/ai/*", "issue": "There is no rate limit or per-user quota on AI calls. Any signed-in member can burn the Emergent LLM budget. Also, each chat turn rebuilds the full portfolio context (up to 60k chars); this costs tokens but works."},
+      {"endpoint": "ai._chat", "issue": "It passes system_message AND a 'system' entry inside initial_messages. Check that emergentintegrations does not send the system prompt twice (doubling a prompt of up to 60k chars)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Assistant chat bubble (civic.css)", "issue": "FIXED by testing agent. The assistant bubble has className 'msg assistant', so it also matched the page layout rule '.assistant{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 300px)}'. Every AI reply rendered about 272px wide and 780px tall, mostly empty. Added display:block;min-height:0 to '.msg.assistant'. Verified: the bubble is now 643x89 on desktop and fits at 390px. A cleaner fix is to rename the layout class (e.g. .assistant-layout).", "selector": "[data-testid^='chat-message-assistant-']", "priority": "HIGH"},
+      {"component": "Assistant.jsx send()", "issue": "If the user clicks another session or 'New conversation' while a reply is streaming, the remaining deltas are appended to the last message of the newly opened conversation, and sid is overwritten by the 'session' event. Disable session switching while busy, or abort the fetch with an AbortController.", "selector": "[data-testid^='chat-session-'], [data-testid='new-chat-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AI assistant", "issues": ["Replies contain markdown (**bold**, '- ' bullets), but it is rendered as plain text, so raw ** shows in every answer. Render markdown (e.g. react-markdown), or tell the model to use plain text.", "remove() (delete chat) has no try/catch or toast on failure."]},
+      {"screen": "Issue AI panel", "issues": ["'Add actions to details' can be clicked repeatedly, and each click appends a duplicate 'Agreed actions' block. Hide or disable it after applying, or check for an existing block.", "ol.ai-actions items show no numbers (list markers are not visible); minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration6_ai.py", "/app/test_reports/pytest/pytest_iter6.xml", "/app/test_reports/pytest/pytest_results.xml", "/app/tests/iter6_seed.py"],
+  "action_items": [
+    "Keep or refine the .msg.assistant CSS fix; ideally rename the .assistant layout class to avoid the collision",
+    "Render markdown in assistant replies (or ask for plain text)",
+    "Guard against switching or starting a conversation while streaming (AbortController or disable)",
+    "Catch LLM exceptions in draft-report and suggest and return 502 with a friendly message",
+    "Make 'Add actions to details' idempotent",
+    "Optional: rate-limit AI endpoints per user; avoid orphan user-only sessions"
+  ],
+  "critical_code_review_comments": [
+    "Sessions are correctly scoped by user_id in own_session; GET, DELETE and POST with someone else's session_id all return 404.",
+    "AiDraft writes into uncontrolled inputs through form.elements[k].value. This works because the fields use defaultValue; it would break if the form fields became controlled.",
+    "_json takes the first '{' to the last '}' with a greedy regex. It is fine for single-object answers, but stray braces in the prose would make it fail with 502."
+  ],
+  "updated_files": ["/app/frontend/src/civic.css (.msg.assistant display:block;min-height:0)", "/app/backend/tests/test_iteration6_ai.py", "/app/tests/iter6_seed.py"],
+  "success_rate": {"backend": "100% (15/15 AI + 49/49 regression)", "frontend": "100% of requested flows (1 layout bug fixed by the testing agent)"},
+  "test_credentials": "Manager qa.manager+clerk_test@civicpro.dev / CivicPro#Mgr2026 (Clerk new-device code 424242) for the UI; Clerk tokens for the manager and engineer via clerk_test_token.py. No roles were changed.",
+  "seed_data_creation": "Created the TEST_UI6 issue, a TEST_AI report, a TEST_AI pytest issue and TEST_ chat sessions; all were deleted. The main agent's pre-existing 'Which projects are behind plan?' session and the 'TEST reminder issue' were left in place. The cron was not triggered.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "This iteration used about 9 LLM calls. AI answers take about 3-15s. Clerk sign-in from Playwright needs the new-device OTP: type 424242 into input[autocomplete=one-time-code]. Expand an issue with [data-testid=issue-<id>-toggle]. Run pytest with REACT_APP_BACKEND_URL exported and deselect TestCron::test_run_once_and_no_resend."
+}

@@ -7,6 +7,8 @@ import { Heading } from "@/components/civic/ui";
 
 const STARTERS = ["Which projects are behind plan and why?", "Summarise this week's site reports", "List high-severity open issues with owners", "What should I check on my next site walk?"];
 
+const Md = ({ text }) => text.split(/(\*\*[^*]+\*\*)/g).map((t, i) => t.startsWith("**") && t.endsWith("**") ? <b key={i}>{t.slice(2, -2)}</b> : t);
+
 export default function Assistant() {
   const api = useApi();
   const { getToken } = useAuth();
@@ -20,8 +22,12 @@ export default function Assistant() {
   useEffect(() => { loadSessions(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const open = async id => { setSid(id); setMessages(await api("get", `/ai/chat/sessions/${id}`)); };
-  const remove = async id => { await api("delete", `/ai/chat/sessions/${id}`); if (id === sid) { setSid(null); setMessages([]); } loadSessions(); };
+  const open = async id => { if (busy) return; setSid(id); setMessages(await api("get", `/ai/chat/sessions/${id}`)); };
+  const remove = async id => {
+    if (busy) return;
+    try { await api("delete", `/ai/chat/sessions/${id}`); if (id === sid) { setSid(null); setMessages([]); } loadSessions(); }
+    catch { toast.error("Could not delete conversation"); }
+  };
 
   const send = async text => {
     const message = (text ?? input).trim();
@@ -57,15 +63,15 @@ export default function Assistant() {
 
   return <div className="content">
     <Heading eyebrow="AI ASSISTANT · GPT-6 ASTRA" title="Ask CIVICPRO" copy="Ask anything about your projects, reports, issues and schedule. Answers use your live workspace data." />
-    <div className="assistant">
+    <div className="assistant-layout">
       <aside className="assistant-sessions" data-testid="chat-sessions">
-        <button className="ghost-btn" onClick={() => { setSid(null); setMessages([]); }} data-testid="new-chat-button"><MessageSquarePlus size={15} /> New conversation</button>
+        <button className="ghost-btn" disabled={busy} onClick={() => { setSid(null); setMessages([]); }} data-testid="new-chat-button"><MessageSquarePlus size={15} /> New conversation</button>
         {sessions.map(s => <div key={s.id} className={`session ${s.id === sid ? "active" : ""}`}><button onClick={() => open(s.id)} data-testid={`chat-session-${s.id}`}>{s.title}</button><button className="icon-btn small" onClick={() => remove(s.id)} aria-label="Delete conversation" data-testid={`delete-chat-${s.id}`}><Trash2 size={13} /></button></div>)}
       </aside>
       <section className="assistant-main">
         <div className="chat-log" data-testid="chat-log">
           {!messages.length && <div className="chat-empty"><Sparkles size={22} /><p>Try one of these:</p><div className="starters">{STARTERS.map((s, i) => <button key={s} onClick={() => send(s)} data-testid={`starter-${i}`}>{s}</button>)}</div></div>}
-          {messages.map((m, i) => <div key={i} className={`msg ${m.role}`} data-testid={`chat-message-${m.role}-${i}`}>{m.content || <span className="typing">Thinking<i>.</i><i>.</i><i>.</i></span>}</div>)}
+          {messages.map((m, i) => <div key={i} className={`msg ${m.role}`} data-testid={`chat-message-${m.role}-${i}`}>{m.content ? <Md text={m.content} /> : <span className="typing">Thinking<i>.</i><i>.</i><i>.</i></span>}</div>)}
           <div ref={end} />
         </div>
         <form className="chat-input" onSubmit={e => { e.preventDefault(); send(); }}>

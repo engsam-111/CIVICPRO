@@ -4,24 +4,29 @@ import { toast } from "sonner";
 import { errorText, saveBlob, uploadFiles, useApi } from "@/lib/api";
 
 const kb = n => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+const INLINE = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", pdf: "application/pdf" };
+export const ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.dwg";
 
 function Thumb({ file }) {
   const api = useApi();
   const [src, setSrc] = useState("");
   useEffect(() => {
     let url = "";
-    if (file.content_type?.startsWith("image/")) api("get", `/files/${file.id}/download`, null, { responseType: "blob" }).then(b => { url = URL.createObjectURL(b); setSrc(url); }).catch(() => {});
+    if (INLINE[file.original_filename.split(".").pop().toLowerCase()]?.startsWith("image/")) api("get", `/files/${file.id}/download`, null, { responseType: "blob" }).then(b => { url = URL.createObjectURL(new Blob([b], { type: INLINE[file.original_filename.split(".").pop().toLowerCase()] })); setSrc(url); }).catch(() => {});
     return () => url && URL.revokeObjectURL(url);
-  }, [api, file.id, file.content_type]);
+  }, [api, file.id, file.original_filename]);
   return src ? <img src={src} alt={file.original_filename} /> : <FileText size={20} />;
 }
 
 export function AttachmentList({ files = [], onChange }) {
   const api = useApi();
   const open = async f => {
-    const win = window.open("", "_blank");
+    const ext = f.original_filename.split(".").pop().toLowerCase();
+    const viewable = INLINE[ext];
+    const win = viewable ? window.open("", "_blank") : null;
     try {
-      const blob = await api("get", `/files/${f.id}/download`, null, { responseType: "blob" });
+      const raw = await api("get", `/files/${f.id}/download`, null, { responseType: "blob" });
+      const blob = new Blob([raw], { type: viewable || "application/octet-stream" });
       if (win) win.location.href = URL.createObjectURL(blob); else saveBlob(blob, f.original_filename);
     } catch { win?.close(); toast.error("Could not open file"); }
   };
@@ -49,6 +54,6 @@ export function Uploader({ target, onDone, testid = "upload" }) {
     catch (err) { toast.error(errorText(err, "Upload failed")); }
     finally { setBusy(false); e.target.value = ""; }
   };
-  return <><input ref={input} type="file" multiple hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg,.csv,.txt" onChange={pick} data-testid={`${testid}-input`} />
+  return <><input ref={input} type="file" multiple hidden accept={ACCEPT} onChange={pick} data-testid={`${testid}-input`} />
     <button type="button" className="ghost-btn" disabled={busy} onClick={() => input.current.click()} data-testid={`${testid}-button`}>{busy ? <Upload size={15} /> : <Paperclip size={15} />} {busy ? "Uploading…" : "Attach photos / documents"}</button></>;
 }

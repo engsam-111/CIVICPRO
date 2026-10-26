@@ -9,7 +9,8 @@ const initials = (name = "") => name.split(" ").map(x => x[0]).join("").slice(0,
 export default function Shell() {
   const me = useMe();
   const { pathname } = useLocation();
-  const nav = me?.role === "manager" ? [...NAV, { to: "/team", label: "Team", icon: Users }] : NAV;
+  const active = me?.status === "active";
+  const nav = !active ? [] : me.role === "manager" ? [...NAV, { to: "/team", label: "Team", icon: Users }] : NAV;
   const crumb = pathname === "/" ? "OVERVIEW" : pathname.split("/")[1].toUpperCase();
   return <div className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">CP</span><div><strong>CIVICPRO</strong><small>FIELD COMMAND</small></div></div>
@@ -20,6 +21,11 @@ export default function Shell() {
         <div className="user-mini"><div className="avatar">{initials(me?.name)}</div><div><b data-testid="current-user-name">{me?.name || "Team member"}</b><small>{me?.email}</small></div></div></div>
     </aside>
     <main className="main-area"><header className="topbar"><div className="crumb">PORTFOLIO <span>/</span> <b>{crumb}</b></div><div className="top-actions"><UserButton /></div></header>
-      {me ? <Outlet /> : <div className="loading-inline" data-testid="page-loading">Preparing workspace…</div>}</main>
+      {!me ? <div className="loading-inline" data-testid="page-loading">Preparing workspace…</div>
+        : me.status !== "active" ? <div className="content"><section className="insight-band" data-testid="pending-approval"><div className="insight-copy"><div><p className="eyebrow">{me.status === "pending" ? "WAITING FOR APPROVAL" : "ACCESS DECLINED"}</p>
+          <h3>{me.status === "pending" ? "A manager needs to approve your access" : "Your access to this workspace was declined"}</h3>
+          <p>{me.status === "pending" ? `You're signed in as ${me.email}. Ask your project manager to approve you on the Team page, then refresh.` : "Contact your project manager if you think this is a mistake."}</p></div></div>
+          {me.status === "pending" && <button className="dark-btn" onClick={() => window.location.reload()} data-testid="pending-refresh-button">Refresh</button>}</section></div>
+        : <Outlet />}</main>
   </div>;
 }

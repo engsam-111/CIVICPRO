@@ -45,12 +45,25 @@ async def clerk_proxy(path: str, request: Request):
 def _jwks_client(secret_key):
     return jwt.PyJWKClient(f"{CLERK_BACKEND_API}/jwks", headers={"Authorization": f"Bearer {secret_key}", "User-Agent": "emergent-app"}, lifespan=3600, timeout=10)
 
+def _expected_issuers():
+    import base64
+    pk = _publishable_key().split("_", 2)[-1]
+    try:
+        domain = base64.b64decode(pk + "=" * (-len(pk) % 4)).decode().rstrip("$")
+    except Exception:
+        return set()
+    return {f"https://{domain}"}
+
 def verify_session_token(token):
     try:
         key = _jwks_client(_secret_key()).get_signing_key_from_jwt(token).key
-        return jwt.decode(token, key=key, algorithms=["RS256"], leeway=5)
+        claims = jwt.decode(token, key=key, algorithms=["RS256"], leeway=5, options={"require": ["exp", "iat", "sub", "iss"]})
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
+    iss = claims.get("iss", "")
+    if not (iss in _expected_issuers() or (_is_production() and iss.startswith("https://") and iss.endswith(PROXY_PATH))):
+        raise HTTPException(status_code=401, detail="Invalid session issuer")
+    return claims
 
 def require_user(request: Request):
     if not _secret_key(): raise HTTPException(status_code=503, detail="Clerk is not configured")

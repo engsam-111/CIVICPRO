@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { uploadFiles, useApi, useResource } from "@/lib/api";
 import { Field, FormModal, Select } from "@/components/civic/ui";
 import { AiDraft } from "@/components/civic/AiTools";
+import { ACCEPT } from "@/components/civic/Attachments";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const projectOptions = projects => [{ value: "", label: "Choose a project" }, ...projects.map(p => ({ value: p.id, label: `${p.code} · ${p.name}` }))];
@@ -15,7 +16,7 @@ async function attach(api, picked, target) {
 }
 
 function FilesField({ inputRef }) {
-  return <label className="field full"><span>Photos or documents (optional)</span><input ref={inputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg,.csv,.txt" data-testid="form-attachments-input" /></label>;
+  return <label className="field full"><span>Photos or documents (optional)</span><input ref={inputRef} type="file" multiple accept={ACCEPT} data-testid="form-attachments-input" /></label>;
 }
 
 export function ProjectForm({ close, onSaved, project }) {

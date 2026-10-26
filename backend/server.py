@@ -11,7 +11,8 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Literal
 from urllib.parse import quote
-import os, re, uuid, logging, requests
+import os, re, time, uuid, logging, requests
+from collections import defaultdict, deque
 
 load_dotenv(Path(__file__).parent / '.env')
 from clerk_auth import clerk_router, require_user  # noqa: E402
@@ -20,6 +21,7 @@ from exports import build_pdf, build_xlsx  # noqa: E402
 from mailer import send_email, overdue_email  # noqa: E402
 from schedule import planned_at, build_curve  # noqa: E402
 from ai import build_ai_router  # noqa: E402
+from filetypes import SAFE_TYPES, INLINE_EXT, safe_type  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("civicpro")
@@ -123,7 +125,8 @@ class IssuePatch(BaseModel):
 
 
 class RolePatch(BaseModel):
-    role: Literal["manager", "supervisor", "engineer"]
+    role: Optional[Literal["manager", "supervisor", "engineer"]] = None
+    status: Optional[Literal["active", "rejected"]] = None
 
 
 def _clean(doc):
@@ -146,22 +149,44 @@ def _clerk_profile(user_id):
     return {"email": primary.get("email_address", ""), "name": name, "is_admin": is_admin}
 
 
-async def current_member(user=Depends(require_user)):
+async def _identity(user=Depends(require_user)):
     uid = user["user_id"]
     member = await db.users.find_one({"user_id": uid}, {"_id": 0})
     if not member or not member.get("email"):
         profile = await run_in_threadpool(_clerk_profile, uid)
         update = {"email": profile["email"], "name": profile["name"]}
         if profile["is_admin"]:
-            update["role"] = "manager"
-        insert = {"user_id": uid, "created_at": now()} | ({} if "role" in update else {"role": DEFAULT_ROLE})
+            update |= {"role": "manager", "status": "active"}
+        insert = {"user_id": uid, "created_at": now()} | ({} if "role" in update else {"role": DEFAULT_ROLE, "status": "pending"})
         await db.users.update_one({"user_id": uid}, {"$set": update, "$setOnInsert": insert}, upsert=True)
         member = await db.users.find_one({"user_id": uid}, {"_id": 0})
     if member.get("role") == "admin":
         member["role"] = "manager"
         await db.users.update_one({"user_id": uid}, {"$set": {"role": "manager"}})
     member["role"] = member.get("role") if member.get("role") in ROLES else DEFAULT_ROLE
+    member["status"] = member.get("status", "active")
     return member
+
+
+async def current_member(member=Depends(_identity)):
+    if member["status"] != "active":
+        raise HTTPException(403, "Your access is waiting for manager approval" if member["status"] == "pending" else "Your access to this workspace was declined")
+    return member
+
+
+_hits = defaultdict(deque)
+
+
+def rate_limit(bucket, limit, window=60):
+    async def dep(member=Depends(current_member)):
+        q, t = _hits[(bucket, member["user_id"])], time.monotonic()
+        while q and q[0] < t - window:
+            q.popleft()
+        if len(q) >= limit:
+            raise HTTPException(429, "Too many requests, please wait a minute and try again")
+        q.append(t)
+        return member
+    return dep
 
 
 async def require_manager(member=Depends(current_member)):
@@ -253,8 +278,8 @@ async def _seed():
 
 
 @api.get("/me")
-async def me(member=Depends(current_member)):
-    return {k: member.get(k) for k in ("user_id", "role", "name", "email")}
+async def me(member=Depends(_identity)):
+    return {k: member.get(k) for k in ("user_id", "role", "name", "email", "status")}
 
 
 @api.get("/projects")
@@ -439,8 +464,9 @@ async def cron_overdue(request: Request, background: BackgroundTasks):
         await db.cron_runs.insert_one({"run_id": run_id, "job": "overdue-reminders", "created_at": now()})
     except DuplicateKeyError:
         return {"status": "duplicate"}
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
-    background.add_task(_run_overdue_reminders, f"https://{host.split(',')[0].strip()}" if host else "", run_id)
+    host = (os.environ.get("APP_PUBLIC_HOST") or request.headers.get("x-forwarded-host") or request.headers.get("host", "")).split(",")[0].strip()
+    host = host if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", host.lower()) else ""
+    background.add_task(_run_overdue_reminders, f"https://{host}" if host else "", run_id)
     return {"status": "accepted", "run_id": run_id}
 
 
@@ -450,7 +476,7 @@ async def delete_issue(iid: str, member=Depends(current_member)):
 
 
 @api.post("/files")
-async def upload_file(file: UploadFile = File(...), project_id: str = Form(...), entity_type: Literal["project", "report", "issue"] = Form("project"), entity_id: str = Form(""), member=Depends(current_member)):
+async def upload_file(file: UploadFile = File(...), project_id: str = Form(...), entity_type: Literal["project", "report", "issue"] = Form("project"), entity_id: str = Form(""), member=Depends(rate_limit("upload", 40))):
     await _project(project_id)
     entity_id = entity_id or project_id
     if entity_type != "project" and not await db[f"{entity_type}s"].find_one({"id": entity_id, "project_id": project_id}):
@@ -458,8 +484,10 @@ async def upload_file(file: UploadFile = File(...), project_id: str = Form(...),
     data = await file.read()
     if not data or len(data) > MAX_FILE:
         raise HTTPException(413, "Files must be between 1 byte and 20 MB")
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "bin"
-    ctype = file.content_type or "application/octet-stream"
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    ctype = safe_type(ext, data)
+    if not ctype:
+        raise HTTPException(415, "Only photos (JPG, PNG, WEBP, GIF, HEIC), PDF, Word, Excel, CSV, TXT and DWG files are allowed")
     result = await run_in_threadpool(put_object, f"{APP_NAME}/uploads/{project_id}/{uuid.uuid4()}.{ext}", data, ctype)
     doc = {"id": str(uuid.uuid4()), "storage_path": result["path"], "original_filename": file.filename, "content_type": ctype, "size": len(data),
            "project_id": project_id, "entity_type": entity_type, "entity_id": entity_id, "uploaded_by_name": member.get("name", ""), "is_deleted": False, "created_at": now()}
@@ -478,8 +506,12 @@ async def download_file(fid: str, member=Depends(current_member)):
     rec = await db.files.find_one({"id": fid, "is_deleted": False}, {"_id": 0})
     if not rec:
         raise HTTPException(404, "File not found")
-    data, ctype = await run_in_threadpool(get_object, rec["storage_path"])
-    return Response(content=data, media_type=rec.get("content_type") or ctype, headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(rec['original_filename'])}"})
+    data, _ = await run_in_threadpool(get_object, rec["storage_path"])
+    ext = rec["original_filename"].rsplit(".", 1)[-1].lower() if "." in rec["original_filename"] else ""
+    ctype = SAFE_TYPES.get(ext, ("application/octet-stream",))[0]
+    disposition = "inline" if ext in INLINE_EXT else "attachment"
+    return Response(content=data, media_type=ctype, headers={"Content-Disposition": f"{disposition}; filename*=UTF-8''{quote(rec['original_filename'])}",
+                                                           "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; sandbox", "Cache-Control": "private, no-store"})
 
 
 @api.delete("/files/{fid}")
@@ -529,7 +561,7 @@ async def dashboard(member=Depends(current_member)):
 
 
 @api.get("/export")
-async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] = None, days: Optional[int] = Query(default=None, ge=1, le=366), member=Depends(current_member)):
+async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] = None, days: Optional[int] = Query(default=None, ge=1, le=366), member=Depends(rate_limit("export", 15))):
     projs = [await _project(project_id)] if project_id else await db.projects.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
     projs = await _with_progress(projs)
     since = (datetime.now(timezone.utc).date() - timedelta(days=days - 1)).isoformat() if days else None
@@ -550,26 +582,43 @@ async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] 
 
 @api.get("/users")
 async def users(member=Depends(require_manager)):
-    return {"roles": ROLES, "users": await db.users.find({}, {"_id": 0, "env": 0}).sort("created_at", 1).to_list(1000)}
+    docs = await db.users.find({}, {"_id": 0, "env": 0}).sort("created_at", 1).to_list(1000)
+    for d in docs:
+        d["status"] = d.get("status", "active")
+    return {"roles": ROLES, "users": docs}
 
 
 @api.patch("/users/{user_id}")
 async def set_role(user_id: str, body: RolePatch, member=Depends(require_manager)):
-    if user_id == member["user_id"] and body.role != "manager":
-        raise HTTPException(400, "You cannot remove your own manager role")
+    update = body.model_dump(exclude_none=True)
+    if not update:
+        raise HTTPException(422, "Nothing to update")
+    demoting = ("role" in update and update["role"] != "manager") or update.get("status") == "rejected"
+    if user_id == member["user_id"] and demoting:
+        raise HTTPException(400, "You cannot remove your own manager access")
     target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
-    if target and (target.get("email") or "").lower() in _admin_emails() and body.role != "manager":
-        raise HTTPException(400, "The workspace owner must stay a manager")
-    doc = await db.users.find_one_and_update({"user_id": user_id}, {"$set": {"role": body.role}}, projection={"_id": 0, "env": 0}, return_document=ReturnDocument.AFTER)
+    if target and (target.get("email") or "").lower() in _admin_emails() and demoting:
+        raise HTTPException(400, "The workspace owner must stay an active manager")
+    doc = await db.users.find_one_and_update({"user_id": user_id}, {"$set": update}, projection={"_id": 0, "env": 0}, return_document=ReturnDocument.AFTER)
     if not doc:
         raise HTTPException(404, "User not found")
+    doc["status"] = doc.get("status", "active")
     return doc
 
 
 app.include_router(api)
-app.include_router(build_ai_router(db, current_member, _with_progress))
+app.include_router(build_ai_router(db, current_member, _with_progress, rate_limit("ai", 12)))
 app.include_router(clerk_router)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","), allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "Content-Type"])
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    return resp
 
 
 @app.on_event("startup")
