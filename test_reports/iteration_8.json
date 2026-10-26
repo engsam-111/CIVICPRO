@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 8 checked the follow-up fixes from iteration 7. Backend: 9 of 9 new tests passed in test_iteration8_followups.py, and 28 of 28 iteration-7 security tests passed (rate-limit class skipped). /api/team returns only active members, and its count matches the active users. Pending and rejected users are excluded, and an approved user appears. /api/users returns is_owner as a boolean (true only for the owner). An upload of 20MB+10 bytes returns 413, and exactly 20MB is accepted. Code review: _run_overdue_reminders filters both the managers' CC list and the issue owner with ACTIVE. Frontend: on the Team page the owner row shows owner-badge with no remove X and a disabled role select. The self row has no remove X and a disabled select. The engineer row keeps the X and an editable select. The pending newbie shows Approve/Decline. The issue owner select lists only the 3 active members (newbie not listed). Assistant: a 429 on a new chat shows the server detail ('Too many requests, please wait a minute and try again') in the bubble and a toast. After the 60s window, the next message POSTs /ai/chat with 200 and creates a fresh session (no 404). While streaming, the session and delete buttons are disabled and the cursor is default. The pending user sees the waiting-for-approval screen on a deep link. Dashboard smoke test OK. 2 LLM calls used. Cron not triggered.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/issues, PATCH /api/issues/{id} (_owner_name)", "issue": "The API still accepts a pending or rejected user as owner_id. It returned 200 with owner 'QA Newbie' while that user was pending. The UI no longer offers these users, and the cron skips non-active owners, so the impact is low. Fix: add ACTIVE to the _owner_name lookup, which returns 404 for a non-active member."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Assistant", "issues": ["The disabled session title and delete buttons keep opacity 1, so they look the same as enabled ones (only the cursor changes). New conversation is visibly dimmed; apply the same disabled style to .session buttons.", "Error bubble copy reads 'Sorry, Too many requests, please wait a minute and try again. Please try again.' It has a capital T after 'Sorry,' and says 'try again' twice. Show the detail as is, or lowercase it and drop the suffix."]},
+      {"screen": "Team", "issues": ["The disabled role select for the owner and self rows looks identical to an editable one. Add a disabled style (muted, not-allowed cursor)."]},
+      {"screen": "Issue form", "issues": ["The Follow-up due field uses the browser's native date input (mm/dd/yyyy) rather than a styled date picker (carried over)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration8_followups.py", "/app/backend/tests/test_iteration7_security.py", "/app/test_reports/pytest/iteration8.xml"],
+  "action_items": [
+    "Optional: filter _owner_name by ACTIVE so the API rejects pending or rejected owners.",
+    "Optional: add a visible disabled style to assistant session/delete buttons and to Team role selects.",
+    "Optional: tidy the assistant error bubble copy (duplicated 'try again', capital T)."
+  ],
+  "critical_code_review_comments": [
+    "file.read(MAX_FILE+1) caps the in-memory read. Starlette still spools the full multipart body to a temp file before the handler runs, so a body-size limit at the ingress/proxy would be needed to stop very large uploads early.",
+    "When owner_id points to a rejected or pending user, the cron sets owner=None and still sends the issue to the active managers, which is good. But issue.owner still shows that person's name in the UI.",
+    "Assistant: the failed exchange from a 429 stays in the local messages list when the next message starts a new session. Display only; the server stores only the new pair."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration8_followups.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created and deleted the TEST_It8 Project (files and one TEST_owner issue inside). 1 chat session was created and deleted via the UI. qa.newbie was left pending; the engineer is active; owner and manager are unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: export REACT_APP_BACKEND_URL=...; pytest -n0 tests/test_iteration8_followups.py (pytest.ini adds xdist, so use -n0 to see prints). To get a 429 on AI without LLM calls in the browser, call fetch /api/ai/draft-report with body {} 12 times using window.Clerk.session.getToken(). Clerk login: input[name=identifier] -> button.cl-formButtonPrimary -> input[name=password] -> OTP 424242."
+}

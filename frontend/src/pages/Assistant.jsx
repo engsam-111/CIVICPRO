@@ -60,7 +60,7 @@ export default function Assistant() {
       }
       if (isNew && !got) setSid(null);
       loadSessions();
-    } catch (e) { if (isNew) setSid(null); append(`Sorry, ${e.message || "I couldn't reach the AI"}. Please try again.`); toast.error(e.message || "AI request failed"); }
+    } catch (e) { if (isNew) setSid(null); append(e.message ? e.message : "Sorry, I couldn't reach the AI. Please try again."); toast.error(e.message || "AI request failed"); }
     finally { setBusy(false); }
   };
 

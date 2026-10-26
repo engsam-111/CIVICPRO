@@ -407,7 +407,7 @@ async def update_issue(iid: str, body: IssuePatch, member=Depends(current_member
 
 
 async def _owner_name(user_id):
-    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    u = await db.users.find_one({"user_id": user_id} | ACTIVE, {"_id": 0, "name": 1, "email": 1})
     if not u:
         raise HTTPException(404, "Team member not found")
     return u.get("name") or u.get("email") or "Team member"

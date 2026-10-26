@@ -25,6 +25,9 @@ me · projects (GET/POST, GET/PATCH/DELETE /{id} with activities/reports/issues/
 - 2026-06 (round 3): Overdue reminders — issue owner chosen from team (GET /api/team); daily 07:00 UTC platform cron (.emergent/crons.yml → POST /api/cron/overdue-reminders, bearer WEBHOOK_CRON_SECRET, idempotent via cron_runs) emails the assignee + a copy to managers ONCE for open issues due yesterday (7-day catch-up window); reminder_sent_at badge; re-armed when due date/owner changes. Emails via Emergent managed Resend (mailer.py, from_name CIVICPRO). Planned vs Actual — project start/finish dates, standard S-curve (smoothstep) planned %, daily progress_snapshots for actual, /api/projects/{id}/curve, S-curve panel on project detail, variance badges + planned tick on project rows, planned/variance in PDF/XLSX. Tested iteration 5 — backend 49/49, frontend 100%.
 
 
+- 2026-06 (security round): upload allowlist + magic-byte check, safe download headers/CSP, manager approval for new sign-ups (pending/active/rejected, Team approve/decline/restore/remove, owner protected), XLSX formula + PDF markup escaping, CORS/security headers, JWT issuer check, per-user rate limits (AI 12/min, export 15/min, upload 40/min). Re-audit: PASS (P3 hardening only). Tested iterations 7-8 — 100%.
+- 2026-06 (AI round): GPT-6 Astra via Emergent LLM key — AI report drafting from rough notes, AI issue action suggestions (apply severity / add to details), AI assistant chat over portfolio data with per-user saved conversations (SSE streaming). Tested iteration 6.
+
 ## Backlog
 - P1: Issue edit form (owner/due/severity) UI; assignment notifications / overdue reminders (email)
 - P1: Report filtering by date range; portfolio-level weekly summary email

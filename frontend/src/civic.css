@@ -74,6 +74,7 @@
 .ai-actions{margin:0;padding-left:18px;font-size:13px;display:grid;gap:6px}.ai-actions small{display:block;font-family:'DM Mono';font-size:10px;color:#a16207}
 .ai-apply{display:flex;gap:16px}
 .approve-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.session button:disabled,.status-select:disabled{opacity:.5;cursor:not-allowed}
 .primary-btn.small,.ghost-btn.small{padding:6px 10px;font-size:12px}
 .pending-list{margin-bottom:18px;border-color:#fde68a}.team-row{grid-template-columns:34px 1fr auto}
 .assistant-layout{display:grid;grid-template-columns:240px 1fr;border:1px solid var(--line);background:#fff;min-height:calc(100vh - 300px)}
