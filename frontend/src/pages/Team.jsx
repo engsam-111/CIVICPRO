@@ -6,6 +6,7 @@ import { Badge, Heading, Loading } from "@/components/civic/ui";
 
 function Member({ u, roles, me, update }) {
   const self = u.user_id === me.user_id;
+  const locked = self || u.is_owner;
   return <div className="team-row" data-testid={`team-member-${u.user_id}`}>
     <div className="avatar light">{(u.name || u.email || "?").slice(0, 2).toUpperCase()}</div>
     <div className="record-main"><b>{u.name || "Team member"}{self && " (you)"} {u.status !== "active" && <Badge tone={u.status === "pending" ? "amber" : "red"} testid={`member-status-${u.user_id}`}>{u.status}</Badge>}</b><small>{u.email || "—"} · joined {u.created_at?.slice(0, 10)}</small></div>
@@ -13,8 +14,9 @@ function Member({ u, roles, me, update }) {
       <button className="primary-btn small" onClick={() => update(u, { status: "active" }, "approved")} data-testid={`approve-${u.user_id}`}><Check size={14} /> Approve</button>
       <button className="ghost-btn small" onClick={() => update(u, { status: "rejected" }, "declined")} data-testid={`decline-${u.user_id}`}><X size={14} /> Decline</button></div>
       : u.status === "rejected" ? <button className="ghost-btn small" onClick={() => update(u, { status: "active" }, "restored")} data-testid={`restore-${u.user_id}`}>Restore access</button>
-      : <div className="approve-actions"><select className="status-select" value={u.role} disabled={self} onChange={e => update(u, { role: e.target.value }, `now ${e.target.value}`)} data-testid={`role-select-${u.user_id}`}>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select>
-        {!self && <button className="icon-btn small" title="Remove access" onClick={() => window.confirm(`Remove ${u.name || u.email}'s access?`) && update(u, { status: "rejected" }, "removed")} data-testid={`remove-${u.user_id}`}><X size={14} /></button>}</div>}
+      : <div className="approve-actions"><select className="status-select" value={u.role} disabled={locked} onChange={e => update(u, { role: e.target.value }, `now ${e.target.value}`)} data-testid={`role-select-${u.user_id}`}>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select>
+        {u.is_owner && <Badge tone="amber" testid={`owner-badge-${u.user_id}`}>owner</Badge>}
+        {!locked && <button className="icon-btn small" title="Remove access" onClick={() => window.confirm(`Remove ${u.name || u.email}'s access?`) && update(u, { status: "rejected" }, "removed")} data-testid={`remove-${u.user_id}`}><X size={14} /></button>}</div>}
   </div>;
 }
 

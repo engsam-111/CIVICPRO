@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 7 tested the security fixes on backend and frontend. Backend: 31 of 31 tests passed in /app/backend/tests/test_iteration7_security.py, covering SEC-001 upload checks and download headers, SEC-002 pending/approve/decline/restore/remove and the self/owner protection, SEC-003 XLSX cells stored as text with no <f> formulas, SEC-004 PDF escaping, security headers, CORS, rejection of forged/none-alg/garbage JWTs, and the AI 12/min, export 15/min and upload 40/min rate limits (429 with a friendly message). Frontend: the pending screen has no nav, the Refresh button keeps the session, and deep links stay on the pending screen. The declined screen works. The manager Team page approve, remove (with confirm) and restore all work. The file picker accept list is correct; a fake .png is rejected with a toast; png+txt upload works; the thumbnail renders; the png opens as a blob in a new tab and the txt downloads. Project summary HTML renders as plain text. The S-curve, PDF export download, the 'Add actions to details' hide, and assistant chat (stored user+assistant, compact bubble, New conversation disabled while streaming) all work. Report with attachment works via the API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/team", "issue": "Returns all users, including pending and rejected ones, so declined or pending people can still be picked as issue owners (and get overdue emails). Filter to status active (missing status counts as active)."},
+      {"endpoint": "_run_overdue_reminders", "issue": "The manager CC list and the issue owner are not filtered by status, so a removed (rejected) manager or owner still gets reminder emails."},
+      {"endpoint": "POST /api/files", "issue": "await file.read() loads the whole body before checking the 20 MB limit. Read at most MAX_FILE+1 bytes."},
+      {"endpoint": "ai_sessions", "issue": "One old orphan session (2781802c..., 1 message) from before the fix is still in the DB. New chats store user+assistant pairs correctly."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Assistant.jsx", "issue": "If a NEW chat's stream fails, the server deletes the session, but the client already ran setSid(ev.session_id). The next message sends that deleted session_id, gets a 404 and shows 'AI request failed' until the user clicks New conversation. Fix: on an error event (or no reply) for a new chat, reset sid to null.", "selector": "[data-testid=chat-send-button]", "priority": "MEDIUM"},
+      {"component": "Assistant.jsx", "issue": "A non-OK /ai/chat response (e.g. 429 'Too many requests, please wait a minute') becomes a generic 'AI request failed'. Show the server's detail.", "selector": "[data-testid=chat-input]", "priority": "LOW"},
+      {"component": "Assistant.jsx", "issue": "Session list and delete buttons are only blocked in JS (if busy return). They are not visibly disabled while streaming.", "selector": "[data-testid^=chat-session-]", "priority": "LOW"},
+      {"component": "Team.jsx", "issue": "The owner row (engsammy122@gmail.com) shows the remove X and an editable role select. The backend correctly returns 400, but the UI should hide or disable these for the ADMIN_EMAIL owner.", "selector": "[data-testid=remove-user_3L9lY32nl7VmhC0M9CP0BBmp9zm]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pending/declined screen", "issues": ["The declined screen uses the same amber band as pending; red would show the state more clearly.", "The sidebar says 'Signed in as engineer' with a green online dot for pending or declined users. Show the status instead.", "On a deep link the breadcrumb shows the route (e.g. PROJECTS) while the pending screen is displayed."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration7_security.py", "/app/test_reports/pytest/iteration7.xml"],
+  "action_items": [
+    "Assistant: reset sid when a new conversation's stream errors or returns no reply, so the next message does not hit a 404.",
+    "Assistant: show the server's detail for non-OK responses (429 message).",
+    "Filter /api/team and the overdue-reminder recipients to active members.",
+    "Team UI: hide or disable remove and role change for the owner account.",
+    "Optional: read uploads with a size cap before buffering; delete the legacy orphan ai_session."
+  ],
+  "critical_code_review_comments": [
+    "Rate limiter is an in-memory dict keyed per user and is never pruned. That is fine for 1 worker, but buckets grow with users and are not shared across workers or replicas.",
+    "The rate_limit dependency runs before body validation, so invalid requests (422) also use up quota. Acceptable, but worth knowing.",
+    "safe_type for docx/xlsx only checks the PK zip header, so any zip renamed .docx is accepted. It is served as an attachment with nosniff, so the risk is low.",
+    "Some other client (not this agent) PATCHed qa.newbie to active twice during testing (backend log lines ~1608 and ~1710, from IP 10.64.x). It looks like a concurrent manual or main-agent session. I reset newbie to pending."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration7_security.py", "/app/memory/test_credentials.md (appended pending newbie account)"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "Created and deleted a TEST_Sec Project, a TEST_UI Sec project (with an issue that had a seeded ai_suggestion, a report and files) and one chat session. qa.newbie was left in status 'pending'. Owner and manager accounts are unchanged; engineer is active.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export REACT_APP_BACKEND_URL=...; pytest tests/test_iteration7_security.py (about 12s; uses mongo directly to reset newbie to pending). The rate-limit tests use the engineer account; wait 60s before other engineer AI/export/upload calls. Clerk Playwright login: input[name=identifier] -> button.cl-formButtonPrimary -> input[name=password] -> OTP 424242 into input[autocomplete=one-time-code]. Used 1 LLM call (chat)."
+}

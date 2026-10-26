@@ -174,6 +174,7 @@ async def current_member(member=Depends(_identity)):
     return member
 
 
+ACTIVE = {"status": {"$nin": ["pending", "rejected"]}}
 _hits = defaultdict(deque)
 
 
@@ -414,7 +415,7 @@ async def _owner_name(user_id):
 
 @api.get("/team")
 async def team(member=Depends(current_member)):
-    return await db.users.find({}, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1}).sort("name", 1).to_list(1000)
+    return await db.users.find(ACTIVE, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1}).sort("name", 1).to_list(1000)
 
 
 async def _run_overdue_reminders(app_url, run_id=None):
@@ -424,11 +425,11 @@ async def _run_overdue_reminders(app_url, run_id=None):
     if not issues:
         return 0
     names = {p["id"]: p["name"] for p in await db.projects.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
-    managers = [m for m in await db.users.find({"role": {"$in": ["manager", "admin"]}}, {"_id": 0}).to_list(100) if m.get("email")]
+    managers = [m for m in await db.users.find({"role": {"$in": ["manager", "admin"]}} | ACTIVE, {"_id": 0}).to_list(100) if m.get("email")]
     sent = 0
     for issue in issues:
         pname = names.get(issue["project_id"], "Unknown project")
-        owner = await db.users.find_one({"user_id": issue["owner_id"]}, {"_id": 0}) if issue.get("owner_id") else None
+        owner = await db.users.find_one({"user_id": issue["owner_id"]} | ACTIVE, {"_id": 0}) if issue.get("owner_id") else None
         ok = False
         if owner and owner.get("email"):
             subject, html = overdue_email(issue, pname, owner.get("name") or "there", app_url, for_manager=False)
@@ -481,7 +482,7 @@ async def upload_file(file: UploadFile = File(...), project_id: str = Form(...),
     entity_id = entity_id or project_id
     if entity_type != "project" and not await db[f"{entity_type}s"].find_one({"id": entity_id, "project_id": project_id}):
         raise HTTPException(404, f"{entity_type.capitalize()} not found")
-    data = await file.read()
+    data = await file.read(MAX_FILE + 1)
     if not data or len(data) > MAX_FILE:
         raise HTTPException(413, "Files must be between 1 byte and 20 MB")
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
@@ -583,8 +584,10 @@ async def export(fmt: Literal["pdf", "xlsx"] = "pdf", project_id: Optional[str] 
 @api.get("/users")
 async def users(member=Depends(require_manager)):
     docs = await db.users.find({}, {"_id": 0, "env": 0}).sort("created_at", 1).to_list(1000)
+    owners = _admin_emails()
     for d in docs:
         d["status"] = d.get("status", "active")
+        d["is_owner"] = (d.get("email") or "").lower() in owners
     return {"roles": ROLES, "users": docs}
 
 

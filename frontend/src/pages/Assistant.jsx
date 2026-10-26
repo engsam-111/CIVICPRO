@@ -36,9 +36,11 @@ export default function Assistant() {
     setBusy(true);
     setMessages(m => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
     const append = chunk => setMessages(m => { const c = [...m]; c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + chunk }; return c; });
+    const isNew = !sid;
+    let got = false;
     try {
       const res = await fetch(`${API}/ai/chat`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await getToken()}` }, body: JSON.stringify({ message, session_id: sid }) });
-      if (!res.ok) throw new Error();
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.detail === "string" ? d.detail : "AI request failed"); }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -52,12 +54,13 @@ export default function Assistant() {
           if (!p.startsWith("data: ")) continue;
           const ev = JSON.parse(p.slice(6));
           if (ev.type === "session") setSid(ev.session_id);
-          if (ev.type === "delta") append(ev.content);
+          if (ev.type === "delta") { got = true; append(ev.content); }
           if (ev.type === "error") { append(ev.message); toast.error(ev.message); }
         }
       }
+      if (isNew && !got) setSid(null);
       loadSessions();
-    } catch { append("Sorry, I couldn't reach the AI. Please try again."); toast.error("AI request failed"); }
+    } catch (e) { if (isNew) setSid(null); append(`Sorry, ${e.message || "I couldn't reach the AI"}. Please try again.`); toast.error(e.message || "AI request failed"); }
     finally { setBusy(false); }
   };
 
@@ -66,7 +69,7 @@ export default function Assistant() {
     <div className="assistant-layout">
       <aside className="assistant-sessions" data-testid="chat-sessions">
         <button className="ghost-btn" disabled={busy} onClick={() => { setSid(null); setMessages([]); }} data-testid="new-chat-button"><MessageSquarePlus size={15} /> New conversation</button>
-        {sessions.map(s => <div key={s.id} className={`session ${s.id === sid ? "active" : ""}`}><button onClick={() => open(s.id)} data-testid={`chat-session-${s.id}`}>{s.title}</button><button className="icon-btn small" onClick={() => remove(s.id)} aria-label="Delete conversation" data-testid={`delete-chat-${s.id}`}><Trash2 size={13} /></button></div>)}
+        {sessions.map(s => <div key={s.id} className={`session ${s.id === sid ? "active" : ""}`}><button disabled={busy} onClick={() => open(s.id)} data-testid={`chat-session-${s.id}`}>{s.title}</button><button className="icon-btn small" disabled={busy} onClick={() => remove(s.id)} aria-label="Delete conversation" data-testid={`delete-chat-${s.id}`}><Trash2 size={13} /></button></div>)}
       </aside>
       <section className="assistant-main">
         <div className="chat-log" data-testid="chat-log">
