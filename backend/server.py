@@ -280,7 +280,8 @@ async def _seed():
 
 @api.get("/me")
 async def me(member=Depends(_identity)):
-    return {k: member.get(k) for k in ("user_id", "role", "name", "email", "status")}
+    out = {k: member.get(k) for k in ("user_id", "role", "name", "email", "status")}
+    return out | {"is_owner": (member.get("email") or "").lower() in _admin_emails()}
 
 
 @api.get("/projects")
@@ -607,6 +608,39 @@ async def set_role(user_id: str, body: RolePatch, member=Depends(require_manager
         raise HTTPException(404, "User not found")
     doc["status"] = doc.get("status", "active")
     return doc
+
+
+class PasswordReset(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+
+
+def _clerk_set_password(user_id, password):
+    r = requests.patch(f"https://api.clerk.com/v1/users/{user_id}", timeout=15, json={"password": password, "sign_out_of_other_sessions": True},
+                       headers={"Authorization": f"Bearer {os.environ['CLERK_SECRET_KEY']}", "User-Agent": "emergent-app"})
+    if r.status_code >= 400:
+        try:
+            err = r.json()["errors"][0]
+            detail = err.get("long_message") or err.get("message")
+        except (ValueError, KeyError, IndexError):
+            detail = None
+        raise HTTPException(422 if r.status_code < 500 else 502, detail or "Could not update the password")
+
+
+@api.post("/users/{user_id}/password")
+async def reset_password(user_id: str, body: PasswordReset, member=Depends(rate_limit("pwreset", 10))):
+    if member["role"] != "manager":
+        raise HTTPException(403, "Only managers can reset passwords")
+    if user_id == member["user_id"]:
+        raise HTTPException(400, "Change your own password from your profile menu")
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "User not found")
+    actor_is_owner = (member.get("email") or "").lower() in _admin_emails()
+    if not actor_is_owner and (target.get("role") in ("manager", "admin") or (target.get("email") or "").lower() in _admin_emails()):
+        raise HTTPException(403, "Only the workspace owner can reset a manager's password")
+    await run_in_threadpool(_clerk_set_password, user_id, body.password)
+    await db.audit_log.insert_one({"id": str(uuid.uuid4()), "action": "password_reset", "actor_id": member["user_id"], "target_id": user_id, "created_at": now()})
+    return {"ok": True}
 
 
 app.include_router(api)

@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Show, SignIn, SignUp } from "@clerk/react";
+import { Show } from "@clerk/react";
+import { SignInForm, SignUpForm } from "@/components/auth/AuthForms";
 import { Toaster } from "sonner";
 import ClerkAuthProvider from "@/components/auth/ClerkAuthProvider";
 import { MeProvider } from "@/lib/api";
@@ -20,7 +21,7 @@ function AuthGate({ children }) {
 function AuthPages() {
   const signup = useLocation().pathname.startsWith("/sign-up");
   return <div className="auth-page"><div className="auth-aside"><span className="brand-mark">CP</span><p>{signup ? "Bring every site update into one clear command center." : "Field intelligence for projects that move the city forward."}</p>{!signup && <span>Secure project workspace</span>}</div>
-    {signup ? <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" /> : <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" withSignUp />}</div>;
+    {signup ? <SignUpForm /> : <SignInForm />}</div>;
 }
 
 export default function App() {

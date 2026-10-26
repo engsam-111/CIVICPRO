@@ -1,10 +1,30 @@
+import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Check, X } from "lucide-react";
+import { Check, KeyRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useApi, useMe, useResource } from "@/lib/api";
-import { Badge, Heading, Loading } from "@/components/civic/ui";
+import { Badge, Heading, Loading, Modal } from "@/components/civic/ui";
+
+function ResetPassword({ u, close }) {
+  const api = useApi();
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async e => {
+    e.preventDefault(); setBusy(true);
+    try { await api("post", `/users/${u.user_id}/password`, { password: pw }); toast.success(`Password reset for ${u.name || u.email}. They've been signed out everywhere.`); close(); }
+    catch (err) { toast.error(errorText(err, "Could not reset password")); }
+    finally { setBusy(false); }
+  };
+  return <Modal title={`Reset password · ${u.name || u.email}`} close={close}><form className="form-grid" onSubmit={submit}>
+    <label className="field full"><span>New password (min. 8 characters)</span><input type="text" value={pw} onChange={e => setPw(e.target.value)} minLength={8} required autoComplete="off" data-testid="new-password-input" /></label>
+    <p className="muted-note full">Share it with them privately. They'll be signed out of all devices and can change it later from their profile menu.</p>
+    <button className="primary-btn form-submit" disabled={busy || pw.length < 8} data-testid="save-password-button">{busy ? "Saving…" : "Set new password"}</button>
+  </form></Modal>;
+}
 
 function Member({ u, roles, me, update }) {
+  const [reset, setReset] = useState(false);
+  const meOwner = me.is_owner;
   const self = u.user_id === me.user_id;
   const locked = self || u.is_owner;
   return <div className="team-row" data-testid={`team-member-${u.user_id}`}>
@@ -16,7 +36,9 @@ function Member({ u, roles, me, update }) {
       : u.status === "rejected" ? <button className="ghost-btn small" onClick={() => update(u, { status: "active" }, "restored")} data-testid={`restore-${u.user_id}`}>Restore access</button>
       : <div className="approve-actions"><select className="status-select" value={u.role} disabled={locked} onChange={e => update(u, { role: e.target.value }, `now ${e.target.value}`)} data-testid={`role-select-${u.user_id}`}>{roles.map(r => <option key={r} value={r}>{r}</option>)}</select>
         {u.is_owner && <Badge tone="amber" testid={`owner-badge-${u.user_id}`}>owner</Badge>}
+        {!self && u.status === "active" && (meOwner || (u.role !== "manager" && !u.is_owner)) && <button className="icon-btn small" title="Reset password" onClick={() => setReset(true)} data-testid={`reset-password-${u.user_id}`}><KeyRound size={14} /></button>}
         {!locked && <button className="icon-btn small" title="Remove access" onClick={() => window.confirm(`Remove ${u.name || u.email}'s access?`) && update(u, { status: "rejected" }, "removed")} data-testid={`remove-${u.user_id}`}><X size={14} /></button>}</div>}
+    {reset && <ResetPassword u={u} close={() => setReset(false)} />}
   </div>;
 }
 
