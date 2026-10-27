@@ -1,0 +1,59 @@
+{
+  "summary": "Completed backend regression and mobile/PWA/auth integration checks on preview URL. Backend suites passed (protected APIs, CRUD, exports, team roles, password reset rules). Frontend mobile/desktop navigation, overflow, CRUD flows (project/activity/report/issue with attachments), PDF/XLSX downloads, pending-user gate, and AI 2-message chat were validated. One genuine PWA offline fallback failure was reproduced during hard navigation offline.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PWA offline navigation",
+        "issue": "When offline and doing hard navigation, app did not render /offline.html fallback; preview showed load failure overlay for missing bundle.js instead.",
+        "selector": "[data-testid='offline-page']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Offline save while disconnected",
+        "issue": "Offline banner appears after offline toggle, but hard-nav offline can fail before reaching page actions, so save-failure UX is not consistently reachable in this path.",
+        "affected_selectors": [
+          "[data-testid='offline-banner']",
+          "[data-testid='new-project-button']",
+          "[data-testid='save-project-button']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration9_password_reset.py",
+    "/app/backend/tests/test_civicpro_api.py",
+    "/app/test_reports/pytest/iteration9_recheck.xml",
+    "/app/test_reports/pytest/iteration9_civicpro_api.xml"
+  ],
+  "action_items": [
+    "Fix service-worker offline hard-navigation fallback so /offline.html reliably renders when network is down.",
+    "Re-verify offline save-failure UX after fallback fix (current hard-nav path can crash before form actions).",
+    "Optional code-quality: Clerk console warns about structural CSS selectors targeting Clerk internals (.cl-userButton*); consider Clerk UI pinning strategy to avoid breakage on Clerk updates.",
+    "Provide /app/auth_testing.md and /app/image_testing.md docs if they are required playbook artifacts for future testing agents."
+  ],
+  "critical_code_review_comments": [
+    "Frontend continues using process.env.REACT_APP_BACKEND_URL correctly; no hardcoded API base URL found in reviewed files.",
+    "Service worker cache scope is correctly limited to public assets (offline page + icons) and excludes API/auth routes, which is good for privacy and auth safety.",
+    "Observed runtime warning from Clerk about structural CSS selectors depending on Clerk internal DOM; this can cause future UI breakage when Clerk updates components."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "92%"
+  },
+  "seed_data_creation": "Created TEST_MOBILE project/activity/report/issue with small PNG/TXT attachments; exported PDF/XLSX; AI test chat created/deleted; TEST_MOBILE project deleted. Engineer password was temporarily changed for reset-flow verification and restored to original. Pending user remained pending.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Key validated states: manager reset engineer password via Team UI; old engineer password rejected; temporary password accepted; original password restored and re-verified. Pending account still gated. Mobile nav and route overflow checks passed on 320/390/768/1024/1440. Offline hard navigation currently fails to show offline fallback page.",
+  "rca of the issue": "RCA (offline bug): SW is registered and cache contains only public assets, but hard offline navigation still surfaced host load-failure overlay instead of rendering /offline.html. This indicates navigate requests are not consistently being served by SW fallback in this preview path (likely control/timing or host-level interception during bundle fetch). Repro: sign in -> set offline -> hard navigate to a route/nonexistent path -> expected offline.html, observed load failure overlay. Mitigation: verify SW controls current client before navigation, ensure fetch handler always catches navigate failures for controlled pages, and re-test offline route transitions in both SPA navigation and hard refresh paths."
+}

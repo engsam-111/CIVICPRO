@@ -2,6 +2,9 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/react";
 import { FileText, FolderKanban, LayoutDashboard, ShieldAlert, Sparkles, Users } from "lucide-react";
 import { useMe } from "@/lib/api";
+import { useEffect } from "react";
+import { MobileNav } from "@/components/mobile/MobileNav";
+import { InstallControl } from "@/components/mobile/InstallPanel";
 
 const NAV = [{ to: "/", label: "Overview", icon: LayoutDashboard }, { to: "/projects", label: "Projects", icon: FolderKanban }, { to: "/reports", label: "Site reports", icon: FileText }, { to: "/issues", label: "Issues & risks", icon: ShieldAlert }, { to: "/assistant", label: "AI assistant", icon: Sparkles }];
 const initials = (name = "") => name.split(" ").map(x => x[0]).join("").slice(0, 2).toUpperCase() || "CP";
@@ -9,6 +12,7 @@ const initials = (name = "") => name.split(" ").map(x => x[0]).join("").slice(0,
 export default function Shell() {
   const me = useMe();
   const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [pathname]);
   const active = me?.status === "active";
   const nav = !active ? [] : me.role === "manager" ? [...NAV, { to: "/team", label: "Team", icon: Users }] : NAV;
   const crumb = pathname === "/" ? "OVERVIEW" : pathname.split("/")[1].toUpperCase();
@@ -20,12 +24,12 @@ export default function Shell() {
       <div className="sidebar-footer"><div className="sync"><span className="online-dot" />Signed in as <b data-testid="current-role">{me?.role || "…"}</b></div>
         <div className="user-mini"><div className="avatar">{initials(me?.name)}</div><div><b data-testid="current-user-name">{me?.name || "Team member"}</b><small>{me?.email}</small></div></div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="crumb">PORTFOLIO <span>/</span> <b>{crumb}</b></div><div className="top-actions"><UserButton /></div></header>
+    <main className="main-area"><header className="topbar"><div className="mobile-brand" data-testid="mobile-brand"><span className="brand-mark">CP</span><div><strong>CIVICPRO</strong><small>FIELD COMMAND</small></div></div><div className="crumb">PORTFOLIO <span>/</span> <b>{crumb}</b></div><div className="top-actions"><InstallControl compact /><div data-testid="account-menu"><UserButton appearance={{ elements: { userButtonTrigger: { minWidth: "44px", minHeight: "44px", justifyContent: "center" } } }} /></div></div></header>
       {!me ? <div className="loading-inline" data-testid="page-loading">Preparing workspace…</div>
         : me.status !== "active" ? <div className="content"><section className="insight-band" data-testid="pending-approval"><div className="insight-copy"><div><p className="eyebrow">{me.status === "pending" ? "WAITING FOR APPROVAL" : "ACCESS DECLINED"}</p>
           <h3>{me.status === "pending" ? "A manager needs to approve your access" : "Your access to this workspace was declined"}</h3>
           <p>{me.status === "pending" ? `You're signed in as ${me.email}. Ask your project manager to approve you on the Team page, then refresh.` : "Contact your project manager if you think this is a mistake."}</p></div></div>
           {me.status === "pending" && <button className="dark-btn" onClick={() => window.location.reload()} data-testid="pending-refresh-button">Refresh</button>}</section></div>
-        : <Outlet />}</main>
+        : <Outlet />}</main>{active && <MobileNav pathname={pathname} />}
   </div>;
 }

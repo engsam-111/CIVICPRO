@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { errorText } from "@/lib/api";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export function Heading({ title, eyebrow, copy, actions }) {
   return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1 data-testid="page-title">{title}<span>.</span></h1>{copy && <p className="subheading">{copy}</p>}</div><div className="heading-actions">{actions}</div></div>;
@@ -23,19 +24,21 @@ export function Select({ name, label, options, defaultValue, full, required = tr
 }
 
 export function Modal({ title, close, children }) {
-  return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><div className="modal" role="dialog" data-testid="form-modal"><div className="modal-header"><h2>{title}</h2><button type="button" className="icon-btn" onClick={close} data-testid="close-modal-button" aria-label="Close"><X size={18} /></button></div>{children}</div></div>;
+  return <Dialog open onOpenChange={open => !open && close()}><DialogContent className="modal civic-dialog" showCloseButton={false} aria-describedby={undefined} onOpenAutoFocus={e => e.preventDefault()} data-testid="form-modal"><div className="modal-header"><DialogTitle>{title}</DialogTitle><button type="button" className="icon-btn" onClick={close} data-testid="close-modal-button" aria-label="Close"><X size={18} /></button></div>{children}</DialogContent></Dialog>;
 }
 
 export function FormModal({ title, close, onSubmit, submitLabel, testid, children }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const submit = async e => {
     e.preventDefault();
+    setError("");
     setBusy(true);
     try { await onSubmit(Object.fromEntries(new FormData(e.target)), e.target); close(); }
-    catch (err) { toast.error(errorText(err, "Could not save")); }
+    catch (err) { const message = errorText(err, "Could not save"); setError(message); toast.error(message); }
     finally { setBusy(false); }
   };
-  return <Modal title={title} close={close}><form onSubmit={submit} className="form-grid">{children}<button className="primary-btn form-submit" disabled={busy} data-testid={testid}>{busy ? "Saving…" : submitLabel}</button></form></Modal>;
+  return <Modal title={title} close={close}><form onSubmit={submit} className="form-grid">{children}{error && <p className="auth-error full" role="alert" data-testid="form-save-error">{error}</p>}<button className="primary-btn form-submit" disabled={busy} data-testid={testid}>{busy ? "Saving…" : submitLabel}</button></form></Modal>;
 }
 
 export function Panel({ eyebrow, title, children, actions, testid }) {

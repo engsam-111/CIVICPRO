@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow, format } from "date-fns";
-import { BarChart3, CheckCircle2, FileText, Flag, FolderKanban, Plus, ShieldAlert } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, FileText, Flag, FolderKanban, Plus, ShieldAlert } from "lucide-react";
 import { useMe, useResource } from "@/lib/api";
 import { Heading, Kpi, Loading, Panel, Empty } from "@/components/civic/ui";
 import { ProgressChart, ReportTrendChart, SeverityChart } from "@/components/civic/Charts";
@@ -28,11 +28,11 @@ export default function Dashboard() {
       <Kpi label="Open follow-ups" value={k.open_issues} delta={`${k.high_open} high priority`} note={`${k.overdue} overdue`} tone="red" icon={Flag} />
       <Kpi label="Reports this week" value={k.reports_week} delta={`${k.reports_total} total`} note="daily + weekly" tone="green" icon={FileText} />
     </section>
-    <div className="chart-grid">
+    <details className="dashboard-analysis" open={window.innerWidth > 900}><summary data-testid="dashboard-charts-toggle">Portfolio analytics<ChevronDown size={18} /></summary><div className="chart-grid">
       <Panel eyebrow="PROGRESS" title="Completion by project" testid="chart-progress-panel"><ProgressChart projects={d.projects} /></Panel>
       <Panel eyebrow="RISK" title="Open issues by severity" testid="chart-severity-panel"><SeverityChart data={d.severity} /></Panel>
       <Panel eyebrow="REPORTING" title="Site reports per week" testid="chart-reports-panel"><ReportTrendChart weeks={d.weeks} /></Panel>
-    </div>
+    </div></details>
     <div className="dashboard-grid">
       <Panel eyebrow="LIVE PORTFOLIO" title="Project health" testid="project-health-panel">
         <div className="project-list">{d.projects.map(p => <ProjectRow key={p.id} project={p} onClick={() => navigate(`/projects/${p.id}`)} />)}</div>

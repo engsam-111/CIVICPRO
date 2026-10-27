@@ -22,7 +22,7 @@ export default function Assistant() {
   useEffect(() => { loadSessions(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const open = async id => { if (busy) return; setSid(id); setMessages(await api("get", `/ai/chat/sessions/${id}`)); };
+  const open = async id => { if (busy) return; try { const history = await api("get", `/ai/chat/sessions/${id}`); setSid(id); setMessages(history); } catch { toast.error("Could not open conversation. Check your connection and try again."); } };
   const remove = async id => {
     if (busy) return;
     try { await api("delete", `/ai/chat/sessions/${id}`); if (id === sid) { setSid(null); setMessages([]); } loadSessions(); }
@@ -32,6 +32,7 @@ export default function Assistant() {
   const send = async text => {
     const message = (text ?? input).trim();
     if (!message || busy) return;
+    if (!navigator.onLine) return toast.error("You're offline. Reconnect to ask CIVICPRO.");
     setInput("");
     setBusy(true);
     setMessages(m => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
@@ -79,7 +80,7 @@ export default function Assistant() {
         </div>
         <form className="chat-input" onSubmit={e => { e.preventDefault(); send(); }}>
           <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="Ask about progress, risks, reports…" data-testid="chat-input" rows={2} />
-          <button className="primary-btn" disabled={busy || !input.trim()} data-testid="chat-send-button"><Send size={16} /></button>
+          <button className="primary-btn" disabled={busy || !input.trim()} aria-label="Send message" data-testid="chat-send-button"><Send size={16} /></button>
         </form>
       </section>
     </div>

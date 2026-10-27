@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-27",
+  "type": "Main-agent browser verification after iteration 9",
+  "status": "pass",
+  "fixes": [
+    "Start service worker registration immediately instead of waiting on page load.",
+    "Use v2 public asset cache, explicit worker offline detection and no-store navigation fetches.",
+    "Keep a persistent inline form-save error on failed/offline save without clearing form inputs."
+  ],
+  "checks": {
+    "current_sw_controls_page_and_v2_cache_active": "pass",
+    "offline_form_save_rejected_with_inline_error": "pass",
+    "unsaved_form_input_preserved_in_memory": "pass",
+    "offline_hard_navigation_projects": "pass",
+    "offline_hard_navigation_unknown_route": "pass",
+    "offline_hard_navigation_sign_in": "pass",
+    "offline_refresh": "pass",
+    "reconnect_retry_restores_authenticated_workspace": "pass",
+    "cache_contains_public_offline_page_and_icons_only": "pass",
+    "chromium_installability_errors": [],
+    "final_production_build": "pass"
+  },
+  "browser_evidence": "/root/.emergent/automation_output/20261027_194301_acb6b4a7f752/console_20261027_194301.log",
+  "limitations": [
+    "Physical-device iPhone/Android installation not exercised.",
+    "App requires internet for private data and saving; no offline synchronization.",
+    "Only preview was tested, not a production deployment."
+  ],
+  "mocked_application_apis": false
+}

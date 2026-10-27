@@ -1,10 +1,10 @@
 {
-  "app_title": "CIVICPRO - Civil Engineering Multi-Project Command Center",
-  "app_type": "hybrid_fullstack",
+  "app_title": "CIVICPRO Mobile - Field Command",
+  "app_type": "mobile_web_app",
   "theme": {
-    "mode": "light/dark dual mode with professional engineering aesthetic",
+    "mode": "light/dark dual mode with tactical field engineering aesthetic",
     "primary_color": "#D97706",
-    "accent_color": "#1E293B",
+    "accent_color": "#0F172A",
     "background_color": "#F8FAFC",
     "card_background": "#FFFFFF",
     "text_primary": "#0F172A",
@@ -16,60 +16,98 @@
     "body_font": "Inter, sans-serif",
     "mono_font": "JetBrains Mono, monospace",
     "hierarchy": {
-      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-bold",
-      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
-      "h3": "text-xl sm:text-2xl font-semibold",
-      "h4": "text-lg sm:text-xl font-medium",
-      "body": "text-base text-slate-700 dark:text-slate-300",
-      "small": "text-sm text-slate-500 dark:text-slate-400"
+      "h1": "text-3xl sm:text-4xl tracking-tight font-black",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-bold",
+      "h3": "text-xl font-semibold",
+      "h4": "text-lg font-medium",
+      "body": "text-base text-slate-700",
+      "small": "text-sm text-slate-500",
+      "tiny": "text-xs font-medium tracking-wider uppercase text-slate-500"
     }
   },
   "color_palette": {
-    "archetype": "Swiss & High-Contrast Industrial Engineering",
+    "archetype": "The Performance Pro (Tactical Minimalism for Construction Field)",
     "colors": {
       "primary": "#D97706",
       "primary_hover": "#B45309",
+      "obsidian": "#0A0A0A",
       "slate_dark": "#0F172A",
       "slate_light": "#F8FAFC",
+      "pure_white": "#FFFFFF",
+      "safety_yellow": "#FACC15",
       "success": "#10B981",
       "warning": "#F59E0B",
       "danger": "#EF4444",
       "info": "#3B82F6"
     }
   },
-  "component_strategy": {
-    "framework": "React + Tailwind CSS + Shadcn/UI primitives + Recharts + Lucide icons",
-    "styling": "Cardless or sharp 8px border-radius, dense data correlation, high contrast badges, and clean technical engineering workspace aesthetics."
-  },
   "grids": {
-    "marketing_bento": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8",
-    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
+    "mobile_dashboard": "grid-cols-2 gap-4",
+    "mobile_list": "flex flex-col gap-3",
+    "mobile_forms": "flex flex-col gap-5"
+  },
+  "layouts": {
+    "shell": "flex flex-col h-screen bg-slate-50 overflow-hidden",
+    "header": "h-16 flex items-center justify-between px-4 bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shrink-0",
+    "main_content": "flex-1 overflow-y-auto pb-24 pt-4 px-4 custom-scrollbar",
+    "bottom_nav": "fixed bottom-0 w-full h-[72px] bg-white border-t border-slate-200 flex justify-around items-center px-2 z-50 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]",
+    "cards": "bg-white border border-slate-200 p-4 shadow-sm relative overflow-hidden active:scale-[0.99] transition-transform",
+    "fab": "fixed bottom-24 right-4 w-14 h-14 bg-[#D97706] rounded-full shadow-lg flex items-center justify-center text-white z-40 active:scale-95 transition-transform"
+  },
+  "mobile_patterns": {
+    "navigation": "Replace sidebar with Bottom Navigation Bar (Home, Projects, Reports, Issues, Assistant). Move Team/Profile to Header avatar dropdown.",
+    "tap_targets": "Minimum 44px x 44px for all interactive elements to support gloved hands on site.",
+    "forms": "Vertical stacks only. No side-by-side inputs on mobile. Native HTML5 date/time pickers where Shadcn is too complex for touch.",
+    "gestures": "Swipeable list items for quick actions (e.g., swipe right to approve, left to reject).",
+    "offline_sync": "Visual indicators for sync status (green dot = synced, amber = offline/pending) in header."
   },
   "motion": {
-    "transition_rules": "transition: transform 0.2s ease, opacity 0.2s ease; no universal all transitions.",
-    "hover_effects": "hover:-translate-y-0.5 transition-all duration-200"
+    "transition_rules": "transition-transform duration-200 ease-out, transition-colors duration-200",
+    "interactions": "active:scale-[0.98] on cards and buttons for physical feedback",
+    "page_transitions": "Slide up for modals/bottom sheets. No complex page transitions to maintain performance."
+  },
+  "component_strategy": {
+    "framework": "React + Tailwind CSS + Shadcn/UI (heavily customized for mobile touch)",
+    "styling": "Tactical Minimalism: Flat solid surfaces, 1px strong borders, high contrast badges, no soft glassmorphism in data areas (to prevent glare).",
+    "modals": "Use Bottom Sheets (Drawer component) instead of center Dialogs for mobile ergonomics.",
+    "tables": "Convert data tables to Card Lists. Never use horizontal scrolling tables on mobile.",
+    "charts": "Recharts with responsive containers, simplified axes, and touch-to-scrub tooltips."
+  },
+  "accessibility": {
+    "contrast_standards": "High contrast for outdoor daylight visibility. Avoid light grey text.",
+    "focus_states": "Visible focus ring (ring-2 ring-offset-2 ring-[#D97706])",
+    "aria_labels": "All interactive elements must have aria-labels and data-testid attributes"
   },
   "image_urls": [
     {
-      "category": "Project Hero - Crane & Structure",
-      "url": "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHwyfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwZW5naW5lZXJpbmclMjBwcm9qZWN0fGVufDB8fHx8MTc5Mjg3MzE0NXww&ixlib=rb-4.1.0&q=85",
-      "description": "Yellow crane near building during daytime for hero showcase"
-    },
-    {
-      "category": "Site Activity & Engineering",
+      "category": "Mobile Empty States / Field Work",
       "url": "https://images.pexels.com/photos/8961260/pexels-photo-8961260.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "Two workers discussing plans on a sandy construction site with safety gear"
-    },
-    {
-      "category": "Skyscraper Construction",
-      "url": "https://images.unsplash.com/photo-1485083269755-a7b559a4fe5e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwyfHxidWlsZGluZyUyMGNvbnN0cnVjdGlvbiUyMGJsdWVwcmludCUyMGNyYW5lfGVufDB8fHx8MTc5Mjg3MzE0NXww&ixlib=rb-4.1.0&q=85",
-      "description": "Several cranes above buildings for project portfolio cover"
+      "description": "Workers discussing plans on a sandy construction site with safety gear"
     }
   ],
-  "accessibility": {
-    "contrast_standards": "APCA and WCAG AA compliant (minimum 4.5:1 text, 3:1 interactive elements)",
-    "focus_states": "Visible focus ring with high contrast and ring-2 ring-amber-500",
-    "aria_labels": "All interactive buttons, dialogs, and tables include aria-label and data-testid attributes"
-  },
-  "instructions_to_main_agent": "Ensure all interactive elements have data-testid attributes. Implement multi-project workspace switching, Gantt timeline tracking, daily/weekly site reporting with struggle and risk assessment, photo/document attachments, and exportable PDF/CSV reports. Follow Swiss engineering high-contrast aesthetic with Outfit and Inter fonts."
+  "instructions_to_main_agent": [
+    "Re-architect App.css, civic.css, and Shell.jsx for mobile-first PWA execution.",
+    "Replace .sidebar with a fixed .bottom-nav using Flexbox. Ensure active states have high contrast.",
+    "Convert .main-area to take full width and handle vertical scrolling with `padding-bottom` to prevent content overlap with the bottom nav.",
+    "Change .kpi-grid and .dashboard-grid to mobile layouts (e.g., grid-cols-2 for small KPIs, full width for charts).",
+    "Transform complex data rows (.project-row, .activity-row, .record-row) into stacked mobile cards (flex-col, gap-2). Remove desktop table headers.",
+    "Add Bottom Sheet/Drawer patterns for complex filters, exports, and forms instead of standard center modals.",
+    "Increase button and list item padding to ensure 44px minimum tap target height. Add `pb-safe` for mobile safe areas.",
+    "Apply 'The Performance Pro' color strategy: High contrast backgrounds with #D97706 highlights and pure white text for maximum readability outdoors.",
+    "Add floating action buttons (FAB) for primary creation actions per tab (e.g., Add Issue, Add Report)."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects carefully (only in headers/navs, never on data cards). DO NOT use complete transparent backgrounds.",
+    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements excluding transforms.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "Every interaction needs micro-animations - active states (scale down), transitions.",
+    "Use generous spacing (p-4 to p-6). Cramped designs look cheap.",
+    "All interactive and key informational elements MUST include a data-testid attribute.",
+    "Use sonner for toast notifications."
+  ]
 }

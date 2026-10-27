@@ -5,22 +5,27 @@ import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 
 const msg = (e, fallback) => e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.longMessage || e?.message || fallback;
 
-function AuthInput({ name, label, type = "text", value, onChange, icon: Icon, autoComplete, minLength }) {
+function AuthInput({ name, label, type = "text", value, onChange, icon: Icon, autoComplete, minLength, inputMode, maxLength }) {
   const [show, setShow] = useState(false);
   const pw = type === "password";
   return <label className="auth-field"><span>{label}</span><div className="auth-input">{Icon && <Icon size={16} />}
-    <input name={name} type={pw && show ? "text" : type} value={value} onChange={e => onChange(e.target.value)} required autoComplete={autoComplete} minLength={minLength} data-testid={`auth-${name}-input`} />
+    <input name={name} type={pw && show ? "text" : type} value={value} onChange={e => onChange(e.target.value)} required autoComplete={autoComplete} minLength={minLength} inputMode={inputMode} maxLength={maxLength} data-testid={`auth-${name}-input`} />
     {pw && <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} data-testid={`auth-${name}-toggle`}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</button>}</div></label>;
 }
 
 function CodeStep({ email, onVerify, onResend, busy, error }) {
   const [code, setCode] = useState("");
+  const [resendError, setResendError] = useState("");
+  const [resent, setResent] = useState(false);
+  const resend = async () => { setResendError(""); setResent(false); try { const result = await onResend(); if (result?.error) throw result.error; setResent(true); } catch (err) { setResendError(msg(err, "Could not resend the code. Try again.")); } };
   return <form className="auth-form" onSubmit={e => { e.preventDefault(); onVerify(code); }} data-testid="auth-code-form">
     <h2>Check your email</h2><p className="auth-sub">We sent a 6-digit code to <b>{email}</b>.</p>
-    <AuthInput name="code" label="Verification code" value={code} onChange={setCode} autoComplete="one-time-code" />
+    <AuthInput name="code" label="Verification code" value={code} onChange={value => setCode(value.replace(/\D/g, ""))} autoComplete="one-time-code" inputMode="numeric" maxLength={6} />
     {error && <p className="auth-error" role="alert" data-testid="auth-error">{error}</p>}
     <button className="primary-btn auth-submit" disabled={busy || code.length < 6} data-testid="auth-verify-button">{busy ? "Verifying…" : "Verify and continue"}</button>
-    <button type="button" className="text-btn" onClick={onResend} disabled={busy} data-testid="auth-resend-button">Resend code</button>
+    {resendError && <p className="auth-error" role="alert" data-testid="auth-resend-error">{resendError}</p>}
+    {resent && <p className="auth-note" role="status" data-testid="auth-code-resent">A new code has been sent.</p>}
+    <button type="button" className="text-btn" onClick={resend} disabled={busy} data-testid="auth-resend-button">Resend code</button>
   </form>;
 }
 
@@ -38,7 +43,7 @@ export function SignInForm() {
     try {
       const r = await signIn.password({ emailAddress: email.trim(), password });
       if (r.error) throw r.error;
-      if (signIn.status === "complete") return done();
+      if (signIn.status === "complete") return await done();
       if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
         const s = await signIn.mfa.sendEmailCode(); if (s.error) throw s.error; return setStep("code");
       }
@@ -48,7 +53,7 @@ export function SignInForm() {
   };
   const verify = async code => {
     setError("");
-    try { const r = await signIn.mfa.verifyEmailCode({ code }); if (r.error) throw r.error; if (signIn.status === "complete") return done(); setError("Verification incomplete, please try again."); }
+    try { const r = await signIn.mfa.verifyEmailCode({ code }); if (r.error) throw r.error; if (signIn.status === "complete") return await done(); setError("Verification incomplete, please try again."); }
     catch (err) { setError(msg(err, "That code didn't work")); }
   };
   if (step === "code") return <CodeStep email={email} onVerify={verify} onResend={() => signIn.mfa.sendEmailCode()} busy={busy} error={error} />;

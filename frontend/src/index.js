@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
+import { registerPwa } from "@/lib/registerPwa";
+
+registerPwa();
 
 const queryClient = new QueryClient({
   defaultOptions: {

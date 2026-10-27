@@ -16,7 +16,7 @@ function ResetPassword({ u, close }) {
     finally { setBusy(false); }
   };
   return <Modal title={`Reset password · ${u.name || u.email}`} close={close}><form className="form-grid" onSubmit={submit}>
-    <label className="field full"><span>New password (min. 8 characters)</span><input type="text" value={pw} onChange={e => setPw(e.target.value)} minLength={8} required autoComplete="off" data-testid="new-password-input" /></label>
+    <label className="field full"><span>New password (min. 8 characters)</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} minLength={8} maxLength={128} required autoComplete="new-password" data-testid="new-password-input" /></label>
     <p className="muted-note full">Share it with them privately. They'll be signed out of all devices and can change it later from their profile menu.</p>
     <button className="primary-btn form-submit" disabled={busy || pw.length < 8} data-testid="save-password-button">{busy ? "Saving…" : "Set new password"}</button>
   </form></Modal>;

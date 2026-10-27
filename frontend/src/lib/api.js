@@ -10,6 +10,7 @@ export function useApi() {
   const ref = useRef(getToken);
   ref.current = getToken;
   return useCallback(async (method, url, data, extra = {}) => {
+    if (!navigator.onLine) throw new Error("You're offline. Reconnect to load or save updates.");
     const token = await ref.current();
     const res = await axios({ method, url: `${API}${url}`, data, headers: { Authorization: `Bearer ${token}` }, ...extra });
     return res.data;
@@ -20,12 +21,13 @@ export function useResource(url) {
   const api = useApi();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const reload = useCallback(() => api("get", url).then(setData).catch(e => { setError(e); toast.error(errorText(e, "Could not load data")); }), [api, url]);
-  useEffect(() => { reload(); }, [reload]);
+  const reload = useCallback(() => api("get", url).then(result => { setData(result); setError(null); }).catch(e => { setError(e); toast.error(errorText(e, "Could not load data")); }), [api, url]);
+  useEffect(() => { reload(); window.addEventListener("online", reload); return () => window.removeEventListener("online", reload); }, [reload]);
   return [data, reload, error];
 }
 
 export const errorText = (e, fallback) => {
+  if (!navigator.onLine) return "You're offline. Reconnect to load or save updates.";
   const d = e?.response?.data?.detail;
   return typeof d === "string" ? d : Array.isArray(d) ? `${d[0]?.loc?.slice(-1)[0] || "Field"}: ${d[0]?.msg}` : fallback;
 };
