@@ -4,6 +4,10 @@
 Civil engineer needs an app to follow up, monitor and report on construction projects: completed activities, progress %, struggles/issues and related info.
 
 ## Latest request
+- User: "In the projects section, add the ability to upload and download files when creating a new project."
+- Failure handling choice: "Keep project and attach later". New projects can have multiple optional files; failed uploads never undo the saved project, and successful files remain attached.
+
+## Previous mobile request
 - User: "recreate all this as APP MOBILE"
 - Clarification: "Installable phone app" — implement as a mobile-first Progressive Web App (PWA), preserving the existing online workspace, features, and desktop experience. Not a native store binary.
 - Earlier unfinished request: email/password login with manager-only forgotten-password resets, using existing Clerk. This was completed and tested during the mobile work.
@@ -27,6 +31,7 @@ Civil engineer needs an app to follow up, monitor and report on construction pro
 - Mobile frontend: `mobile.css` layers responsive changes onto existing desktop styles; `components/mobile/` PwaProvider, MobileNav, InstallPanel; `/more` route for AI, manager-only Team, account identity and installation.
 - PWA: `public/manifest.json`, `public/sw.js`, `public/offline.html`, `public/icons/`; early registration in `lib/registerPwa.js` via `index.js`. Public cache only; no caching of API responses, Clerk auth, app HTML, files, or private records. Navigate fetches bypass HTTP cache and use offline fallback on network loss.
 - Shared forms use existing shadcn/Radix dialog for focus trapping and escape/backdrop close; bottom sheets on small phones. Existing FastAPI/MongoDB data model unchanged by mobile conversion.
+- New-project file flow: `components/civic/ProjectFiles.jsx` provides optional multi-file selection, local download/remove controls and persistent failed-upload notice. `ProjectForm` saves project first then uploads each file independently via existing `/api/files`. `ProjectDetail` supports `?tab=files`; `Attachments.jsx` provides explicit authenticated downloads. No new storage service or backend data-model changes.
 
 ## Key endpoints (all /api, Clerk bearer)
 me · projects (GET/POST, GET/PATCH/DELETE /{id} with activities/reports/issues/files) · activities CRUD · reports GET/POST/PATCH/DELETE · issues GET/POST/PATCH/DELETE · files POST (multipart) / GET / GET {id}/download / DELETE · dashboard · export?fmt=pdf|xlsx&project_id&days · users GET, PATCH /{user_id} (manager only)
@@ -44,6 +49,13 @@ me · projects (GET/POST, GET/PATCH/DELETE /{id} with activities/reports/issues/
 - 2026-10-27 (mobile PWA): home-screen manifest, CP icons (192/512/maskable/apple-touch), platform-sensitive install help, browser install prompt and installed-state handling. iPhone safe-area support, fixed 5-tab phone navigation, sticky branded header, responsive charts/records/teams/AI chat, touch-sized controls, non-zooming inputs, bottom-sheet forms, preserved desktop sidebar. Dashboard analytics collapsible on mobile, all charts retained. More page exposes AI and authorized team management.
 - 2026-10-27 (auth completion): tested custom Clerk email/password and manager password resets; fixed async finalize error handling, numeric one-time-code input, resend success/error reporting, signed-in auth-route redirect, masked reset-password input. Test engineer password temporarily changed and then restored/reverified. Current values remain in `test_credentials.md`.
 - 2026-10-27 (offline follow-up): immediate service-worker registration, v2 public cache, explicit offline detection plus no-store navigations eliminate app-HTML/bundle mismatch. Offline save rejected with persistent inline error while keeping the in-memory form intact. Online event refreshes resources. No offline queue or offline record access implemented/promised.
+- 2026-10-27 (new-project files): optional multi-file picker in project creation, append/deduplicate/remove selection and download selected files; save project then upload each file under that project's ID. Mixed upload failures preserve project and successful files, continue the batch, and show a dismissible filename/reason notice in Files. Saves with attachments open the new project's Files tab, retained after reload. Explicit authenticated download buttons added alongside existing file previews; report/issue attachment controls retained. Upload limits/types remain existing backend allowlist and 20 MB/file.
+
+## Verification — new-project files
+- `yarn build`: successful after implementation.
+- `/app/test_reports/iteration_10.json`: focused backend 4/4 passed; real upload/download byte and filename checks, auth-required download and no storage-path exposure. UI passed selection/dedup/removal/local download/cancel, creation+file persistence, partial 415 rejection with later successes, warning dismissal, attach-later recovery, no-file creation, edit regression, Dashboard reuse, and 320/390 responsive checks.
+- Inconclusive automated popup capture was resolved by main-agent browser check: new PNG attachment opened in a new tab with blob URL and rendered original 192×192 dimensions, original Files tab preserved. The first follow-up used an incorrect `blob:*` URL glob; corrected DOM/URL predicate passed without app changes. Temporary project deleted afterward.
+- Follow-up evidence: `/root/.emergent/automation_output/20261027_202545_7748a017584d/console_20261027_202545.log`. No mocked API or credential changes. Existing real projects were not edited by the feature tests.
 
 ## Verification — mobile conversion
 - `yarn build`: production compilation successful, including final follow-up edits.
@@ -54,6 +66,7 @@ me · projects (GET/POST, GET/PATCH/DELETE /{id} with activities/reports/issues/
 
 ## Backlog
 - P0: No known blocking defects in tested mobile flows. Await user's acceptance on their phone.
+- Next action for latest feature: Projects → New project → Project files; save, then download from Files. No known blocking issues in tested upload/download flows.
 - P1 verification: install/open/close/sign-in/logout from real iPhone Safari and Android Chrome home-screen apps; verify device file-picker/camera and export behavior. Physical-device app installation is the next action.
 - P1 verification carried forward: deployed reminder cron and real recipient inbox delivery; production storage behavior and earlier deployment completion remain unverified.
 - P1 features: issue edit form (owner/due/severity), report date-range filtering, assignment notifications, portfolio-level weekly summary email.

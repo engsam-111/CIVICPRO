@@ -1,9 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { uploadFiles, useApi, useResource } from "@/lib/api";
+import { errorText, uploadFiles, useApi, useResource } from "@/lib/api";
 import { Field, FormModal, Select } from "@/components/civic/ui";
 import { AiDraft } from "@/components/civic/AiTools";
 import { ACCEPT } from "@/components/civic/Attachments";
+import { ProjectFilePicker } from "@/components/civic/ProjectFiles";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const projectOptions = projects => [{ value: "", label: "Choose a project" }, ...projects.map(p => ({ value: p.id, label: `${p.code} · ${p.name}` }))];
@@ -21,11 +23,24 @@ function FilesField({ inputRef }) {
 
 export function ProjectForm({ close, onSaved, project }) {
   const api = useApi();
+  const navigate = useNavigate();
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const submit = async f => {
     const body = { ...f, progress: num(f.progress) };
-    await (project ? api("patch", `/projects/${project.id}`, body) : api("post", "/projects", body));
-    toast.success(project ? "Project updated" : "Project added");
-    await onSaved();
+    setUploading(true);
+    try {
+      const saved = await (project ? api("patch", `/projects/${project.id}`, body) : api("post", "/projects", body));
+      const failures = [];
+      if (!project) for (const file of files) {
+        try { await uploadFiles(api, [file], { project_id: saved.id, entity_type: "project", entity_id: saved.id }); }
+        catch (error) { failures.push({ name: file.name, reason: errorText(error, "Upload failed") }); }
+      }
+      if (failures.length) toast.warning("Project saved. Some files couldn't be uploaded; attach them later from Files.");
+      else toast.success(project ? "Project updated" : files.length ? "Project and files saved" : "Project added");
+      await onSaved();
+      if (!project && files.length) navigate(`/projects/${saved.id}?tab=files`, { state: { uploadFailures: failures } });
+    } finally { setUploading(false); }
   };
   const p = project || {};
   return <FormModal title={project ? "Edit project" : "Add project"} close={close} onSubmit={submit} submitLabel="Save project" testid="save-project-button">
@@ -38,6 +53,7 @@ export function ProjectForm({ close, onSaved, project }) {
     <Field name="start_date" label="Planned start" type="date" required={false} defaultValue={p.start_date} />
     <Field name="end_date" label="Planned finish" type="date" required={false} defaultValue={p.end_date} />
     <Field name="summary" label="Project summary" type="textarea" full required={false} placeholder="Scope, current stage, key notes…" defaultValue={p.summary} />
+    {!project && <ProjectFilePicker files={files} onChange={setFiles} disabled={uploading} />}
   </FormModal>;
 }
 

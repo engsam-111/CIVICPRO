@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FileText, Paperclip, Trash2, Upload } from "lucide-react";
+import { Download, FileText, Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, saveBlob, uploadFiles, useApi } from "@/lib/api";
 
@@ -16,6 +16,20 @@ function Thumb({ file }) {
     return () => url && URL.revokeObjectURL(url);
   }, [api, file.id, file.original_filename]);
   return src ? <img src={src} alt={file.original_filename} /> : <FileText size={20} />;
+}
+
+function DownloadFile({ file }) {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const blob = await api("get", `/files/${file.id}/download`, null, { responseType: "blob" });
+      saveBlob(blob, file.original_filename.replace(/[\\/]/g, "_"));
+    } catch (error) { toast.error(errorText(error, "Could not download file")); }
+    finally { setBusy(false); }
+  };
+  return <button type="button" className="icon-btn small" disabled={busy} onClick={download} aria-label={`Download ${file.original_filename}`} title={busy ? "Downloading…" : "Download file"} data-testid={`download-attachment-${file.id}`}><Download size={16} /></button>;
 }
 
 export function AttachmentList({ files = [], onChange }) {
@@ -36,8 +50,9 @@ export function AttachmentList({ files = [], onChange }) {
   };
   if (!files.length) return <p className="muted-note" data-testid="no-attachments">No photos or documents attached yet.</p>;
   return <div className="attachments" data-testid="attachment-list">{files.map(f => <div className="attachment" key={f.id} data-testid={`attachment-${f.id}`}>
-    <button type="button" className="attachment-thumb" onClick={() => open(f)} data-testid={`open-attachment-${f.id}`}><Thumb file={f} /></button>
+    <button type="button" className="attachment-thumb" onClick={() => open(f)} aria-label={`Open ${f.original_filename}`} title="Open file" data-testid={`open-attachment-${f.id}`}><Thumb file={f} /></button>
     <div className="attachment-meta"><b title={f.original_filename}>{f.original_filename}</b><small>{kb(f.size)} · {f.uploaded_by_name || "Team"}</small></div>
+    <DownloadFile file={f} />
     {onChange && <button type="button" className="icon-btn small" onClick={() => remove(f)} aria-label="Remove attachment" data-testid={`delete-attachment-${f.id}`}><Trash2 size={14} /></button>}
   </div>)}</div>;
 }

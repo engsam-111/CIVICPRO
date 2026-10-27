@@ -18,6 +18,14 @@
 .export-pop b,.export-pop small{display:block}.export-pop b{font-size:13px}.export-pop small{font-size:10px;color:#94a3b8;font-family:'DM Mono'}
 @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .project-list.flush{border-top:0}
+.project-file-picker{min-width:0;border-top:1px solid var(--line);padding-top:18px}
+.picked-file-count{font-size:12px;color:var(--muted);margin:12px 0 8px}
+.picked-file-list{display:grid;gap:8px}
+.picked-file{display:flex;gap:10px;align-items:center;border:1px solid var(--line);padding:10px;border-radius:5px;min-width:0}
+.picked-file>svg{flex:none;color:var(--muted)}
+.project-upload-notice{display:flex;gap:12px;align-items:flex-start;margin-bottom:18px;padding:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;color:#854d0e;font-size:13px;line-height:1.6}
+.project-upload-notice>div{flex:1;min-width:0;overflow-wrap:anywhere}.project-upload-notice p{margin:4px 0}.project-upload-notice ul{padding-left:18px;margin:8px 0 0}
+.icon-btn:disabled{opacity:.5;cursor:wait;transform:none}
 .list-toolbar{flex-wrap:wrap}
 .chips{display:flex;gap:4px;margin-left:auto}
 .chips button{border:1px solid var(--line);background:#fff;padding:6px 10px;font-size:11px;color:#475569;transition:background-color .15s,color .15s}

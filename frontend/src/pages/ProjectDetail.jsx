@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { errorText, useApi, useResource } from "@/lib/api";
@@ -10,6 +10,7 @@ import { ActivityForm, IssueForm, ProjectForm, ReportForm } from "@/components/c
 import { IssueList, ReportList } from "@/components/civic/Records";
 import { AttachmentList, Uploader } from "@/components/civic/Attachments";
 import ExportMenu from "@/components/civic/ExportMenu";
+import { ProjectUploadNotice } from "@/components/civic/ProjectFiles";
 
 function ActivityRow({ a, reload }) {
   const api = useApi();
@@ -51,9 +52,12 @@ const TABS = ["activities", "reports", "issues", "files"];
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const api = useApi();
   const [d, reload, error] = useResource(`/projects/${id}`);
-  const [tab, setTab] = useState("activities");
+  const tab = TABS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "activities";
+  const setTab = value => setSearchParams(params => { params.set("tab", value); return params; }, { replace: true, state: location.state });
   const [modal, setModal] = useState("");
   if (error) return <div className="content"><Empty testid="project-not-found">Project not found. <button className="text-btn" onClick={() => navigate("/projects")}>Back to projects</button></Empty></div>;
   if (!d) return <Loading />;
@@ -75,13 +79,13 @@ export default function ProjectDetail() {
       {p.summary && <p className="hero-summary" data-testid="project-summary">{p.summary}</p>}
     </section>
     <SchedulePanel key={`${p.progress}-${p.start_date}-${p.end_date}`} project={p} onEdit={() => setModal("edit")} />
-    <div className="tabs" role="tablist">{TABS.map(t => <button key={t} role="tab" className={tab === t ? "active" : ""} onClick={() => setTab(t)} data-testid={`tab-${t}`}>{t}<i>{counts[t]}</i></button>)}
+    <div className="tabs" role="tablist">{TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} onClick={() => setTab(t)} data-testid={`tab-${t}`}>{t}<i>{counts[t]}</i></button>)}
       <div className="tab-action">{add ? <button className="primary-btn" onClick={() => setModal(add)} data-testid={`add-${add}-button`}><Plus size={16} /> Add {add}</button> : <Uploader target={{ project_id: p.id, entity_type: "project" }} onDone={reload} testid="project-upload" />}</div></div>
     <div className="list-page">
       {tab === "activities" && (d.activities.length ? <div className="record-list">{d.activities.map(a => <ActivityRow key={a.id} a={a} reload={reload} />)}</div> : <Empty testid="activities-empty">No activities yet. Break the project into weighted activities to calculate progress automatically.</Empty>)}
       {tab === "reports" && <ReportList reports={d.reports} reload={reload} />}
       {tab === "issues" && <IssueList issues={d.issues} reload={reload} />}
-      {tab === "files" && <div className="files-pane"><AttachmentList files={d.files} onChange={reload} /></div>}
+      {tab === "files" && <div className="files-pane"><ProjectUploadNotice failures={location.state?.uploadFailures} dismiss={() => navigate(location.pathname + location.search, { replace: true, state: null })} /><AttachmentList files={d.files} onChange={reload} /></div>}
     </div>
     {modal === "edit" && <ProjectForm project={p} close={() => setModal("")} onSaved={reload} />}
     {modal === "activity" && <ActivityForm projectId={p.id} close={() => setModal("")} onSaved={reload} />}
